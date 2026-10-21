@@ -101,16 +101,10 @@ const App = {
       }
     });
 
-    const screenAuth = document.getElementById('screenAuth');
-    const mainLayout = document.getElementById('appMainLayout');
-    const bottomNav = document.querySelector('.bottom-nav');
-
     // Requirement 1: If user is authenticated in this session, show app layout;
     // Otherwise, show Login Screen prominently as the first thing user sees!
     if (AppState.currentUser) {
-      if (screenAuth) screenAuth.style.display = 'none';
-      if (mainLayout) mainLayout.style.display = 'flex';
-      if (bottomNav) bottomNav.style.display = '';
+      this.showAppLayout();
       this.renderRoleUI();
       this.renderChart();
       this.renderDashboard();
@@ -128,12 +122,32 @@ const App = {
       document.querySelectorAll('.modal-overlay').forEach(modal => {
         modal.classList.remove('active');
       });
-      if (bottomNav) bottomNav.style.display = 'none';
-      if (screenAuth) screenAuth.style.display = 'flex';
-      if (mainLayout) mainLayout.style.display = 'none';
+      this.showAuthScreen();
       this.switchAuthTab('login');
       this.selectAuthRole('pengurus');
     }
+  },
+
+  showAppLayout() {
+    document.querySelectorAll('#screenAuth, .auth-screen-container').forEach(el => {
+      el.style.display = 'none';
+    });
+    document.querySelectorAll('#appMainLayout, .app-container').forEach(el => {
+      el.style.display = 'flex';
+    });
+    const bottomNav = document.querySelector('.bottom-nav');
+    if (bottomNav) bottomNav.style.display = '';
+  },
+
+  showAuthScreen() {
+    document.querySelectorAll('#appMainLayout, .app-container').forEach(el => {
+      el.style.display = 'none';
+    });
+    document.querySelectorAll('#screenAuth, .auth-screen-container').forEach(el => {
+      el.style.display = 'flex';
+    });
+    const bottomNav = document.querySelector('.bottom-nav');
+    if (bottomNav) bottomNav.style.display = 'none';
   },
 
   // Initialize Session (Checks sessionStorage first so fresh browser link shows login first)
@@ -996,13 +1010,7 @@ const App = {
       modal.classList.remove('active');
     });
 
-    const bottomNav = document.querySelector('.bottom-nav');
-    if (bottomNav) bottomNav.style.display = 'none';
-
-    const screenAuth = document.getElementById('screenAuth');
-    const mainLayout = document.getElementById('appMainLayout');
-    if (mainLayout) mainLayout.style.display = 'none';
-    if (screenAuth) screenAuth.style.display = 'flex';
+    this.showAuthScreen();
     this.switchAuthTab(defaultTab);
     this.selectAuthRole(defaultRole);
   },
@@ -1195,12 +1203,7 @@ const App = {
         // Tutup paksa semua modal overlay jika ada yang tertinggal
         document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
 
-        const screenAuth = document.getElementById('screenAuth');
-        const mainLayout = document.getElementById('appMainLayout');
-        const bottomNav = document.querySelector('.bottom-nav');
-        if (screenAuth) screenAuth.style.display = 'none';
-        if (mainLayout) mainLayout.style.display = 'flex';
-        if (bottomNav) bottomNav.style.display = '';
+        this.showAppLayout();
 
         this.renderRoleUI();
         this.renderChart();
@@ -1245,12 +1248,7 @@ const App = {
         // Tutup paksa semua modal overlay jika ada yang tertinggal
         document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
 
-        const screenAuth = document.getElementById('screenAuth');
-        const mainLayout = document.getElementById('appMainLayout');
-        const bottomNav = document.querySelector('.bottom-nav');
-        if (screenAuth) screenAuth.style.display = 'none';
-        if (mainLayout) mainLayout.style.display = 'flex';
-        if (bottomNav) bottomNav.style.display = '';
+        this.showAppLayout();
 
         this.renderRoleUI();
         this.renderResidents();
@@ -1297,12 +1295,7 @@ const App = {
           this.setAuthSession(user);
 
           document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
-          const screenAuth = document.getElementById('screenAuth');
-          const mainLayout = document.getElementById('appMainLayout');
-          const bottomNav = document.querySelector('.bottom-nav');
-          if (screenAuth) screenAuth.style.display = 'none';
-          if (mainLayout) mainLayout.style.display = 'flex';
-          if (bottomNav) bottomNav.style.display = '';
+          this.showAppLayout();
 
           this.renderRoleUI();
           this.renderDashboard();
@@ -1328,12 +1321,7 @@ const App = {
         };
         this.setAuthSession(user);
         document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
-        const screenAuth = document.getElementById('screenAuth');
-        const mainLayout = document.getElementById('appMainLayout');
-        const bottomNav = document.querySelector('.bottom-nav');
-        if (screenAuth) screenAuth.style.display = 'none';
-        if (mainLayout) mainLayout.style.display = 'flex';
-        if (bottomNav) bottomNav.style.display = '';
+        this.showAppLayout();
         this.renderRoleUI();
         this.renderChart();
         this.renderDashboard();
@@ -1391,12 +1379,7 @@ const App = {
       // Tutup paksa semua modal overlay jika ada yang tertinggal
       document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
 
-      const screenAuth = document.getElementById('screenAuth');
-      const mainLayout = document.getElementById('appMainLayout');
-      const bottomNav = document.querySelector('.bottom-nav');
-      if (screenAuth) screenAuth.style.display = 'none';
-      if (mainLayout) mainLayout.style.display = 'flex';
-      if (bottomNav) bottomNav.style.display = '';
+      this.showAppLayout();
 
       this.renderRoleUI();
       this.renderDashboard();
@@ -1427,12 +1410,7 @@ const App = {
       };
       this.setAuthSession(user);
     }
-    const screenAuth = document.getElementById('screenAuth');
-    const mainLayout = document.getElementById('appMainLayout');
-    const bottomNav = document.querySelector('.bottom-nav');
-    if (screenAuth) screenAuth.style.display = 'none';
-    if (mainLayout) mainLayout.style.display = 'flex';
-    if (bottomNav) bottomNav.style.display = '';
+    this.showAppLayout();
     this.switchTab('dashboard');
   },
 
@@ -1459,14 +1437,7 @@ const App = {
         modal.classList.remove('active');
       });
 
-      // Sembunyikan bottom navigation mobile saat di layar login
-      const bottomNav = document.querySelector('.bottom-nav');
-      if (bottomNav) bottomNav.style.display = 'none';
-
-      const screenAuth = document.getElementById('screenAuth');
-      const mainLayout = document.getElementById('appMainLayout');
-      if (mainLayout) mainLayout.style.display = 'none';
-      if (screenAuth) screenAuth.style.display = 'flex';
+      this.showAuthScreen();
 
       this.switchAuthTab('login');
       this.selectAuthRole('pengurus');
@@ -1582,12 +1553,7 @@ const App = {
     };
     this.setAuthSession(user);
 
-    const screenAuth = document.getElementById('screenAuth');
-    const mainLayout = document.getElementById('appMainLayout');
-    const bottomNav = document.querySelector('.bottom-nav');
-    if (screenAuth) screenAuth.style.display = 'none';
-    if (mainLayout) mainLayout.style.display = 'flex';
-    if (bottomNav) bottomNav.style.display = '';
+    this.showAppLayout();
 
     this.renderRoleUI();
     this.renderResidents();
@@ -2837,9 +2803,15 @@ const App = {
           <span style="font-size: 11px; color: #64748b;">${t.waktu || '10:00'} WIB</span>
         </td>
         <td>
-          <span class="badge-status ${isMasuk ? 'badge-approved' : 'badge-keluar'}">
-            ${isMasuk ? 'Kas Masuk' : 'Kas Keluar'}
-          </span>
+          ${t.status === 'Pending' ? `
+            <span class="badge-status badge-pending" style="cursor: pointer;" title="Klik untuk verifikasi bukti pembayaran" onclick="App.previewBuktiTransfer('${t.id}')">
+              ⏳ Pending
+            </span>
+          ` : `
+            <span class="badge-status ${isMasuk ? 'badge-approved' : 'badge-keluar'}">
+              ${isMasuk ? 'Kas Masuk' : 'Kas Keluar'}
+            </span>
+          `}
         </td>
         <td>
           <strong>${t.judul}</strong><br>
@@ -2851,9 +2823,23 @@ const App = {
         <td style="text-align: right; font-weight: 800; font-size: 13.5px;" class="${isMasuk ? 'positive' : 'negative'}">
           ${isMasuk ? '+' : '-'}${ReportGenerator.formatRupiah(t.nominal)}
         </td>
-        <td><span style="font-size: 11.5px;">${t.metode}</span></td>
+        <td>
+          <span style="font-size: 11.5px;">${t.metode}</span>
+          ${(t.buktiTransfer || t.buktiFoto) ? `
+            <div style="margin-top: 3px;">
+              <button type="button" class="btn-outline-pill" style="padding: 2px 7px; font-size: 10.5px; color: #0f766e; border-color: #99f6e4; background: #f0fdfa;" onclick="App.previewBuktiTransfer('${t.id}')">
+                📸 Bukti Transfer
+              </button>
+            </div>
+          ` : ''}
+        </td>
         <td>
           <div class="table-actions">
+            ${(t.status === 'Pending' && AppState.currentRole === 'pengurus') ? `
+              <button class="btn-teal-pill pengurus-only" style="padding: 3px 8px; font-size: 11px;" title="Verifikasi & Setujui" onclick="App.previewBuktiTransfer('${t.id}')">
+                Verifikasi
+              </button>
+            ` : ''}
             <button class="btn-icon-action" title="Cetak Kwitansi" onclick="ReportGenerator.openKwitansi(${JSON.stringify(t).replace(/"/g, '&quot;')})">
               <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
             </button>
@@ -3215,6 +3201,22 @@ const App = {
     const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
     const monthName = monthNames[monthNum - 1] || 'Bulan';
     const monthlyFee = Number(this.data.settings?.iuranWajibBulanan) || 150000;
+
+    // =========================================================================
+    // KONDISI 0: STATUS SAAT INI ADALAH PENDING (WARGA SUDAH UPLOAD BUKTI TRANSFER/QRIS)
+    // =========================================================================
+    if (current === 'Pending') {
+      const pendingTx = (this.data.transactions || []).find(t => 
+        t.residentId === resId && 
+        Number(t.periodeBulan) === monthNum && 
+        Number(t.periodeTahun || 2026) === curYear && 
+        t.status === 'Pending'
+      );
+      if (pendingTx) {
+        this.previewBuktiTransfer(pendingTx.id);
+        return;
+      }
+    }
 
     // =========================================================================
     // KONDISI 1: STATUS SAAT INI ADALAH LUNAS -> BUKA KUNCI / KOREKSI
@@ -5279,7 +5281,12 @@ const App = {
                 📄 Cetak Kwitansi
               </button>
             ` : (st === 'Pending' ? `
-              <span style="font-size: 11px; color: #b45309; font-weight: 600;">⏳ Menunggu Verifikasi Bendahara</span>
+              <div style="display: flex; gap: 6px; align-items: center; justify-content: flex-end;">
+                <span style="font-size: 11px; color: #b45309; font-weight: 600;">⏳ Menunggu Verifikasi</span>
+                <button type="button" class="btn-outline-pill" style="padding: 2px 7px; font-size: 10.5px; color: #0f766e; border-color: #99f6e4; background: #f0fdfa;" onclick="App.previewWargaPendingBukti(${curWargaYear}, ${m})">
+                  📷 Bukti
+                </button>
+              </div>
             ` : `
               <button class="btn-teal-pill" style="padding: 4px 10px; font-size: 11px;" onclick="App.openWargaBayarModal(${curWargaYear}, ${m})">
                 💳 Bayar Sekarang
@@ -5305,9 +5312,16 @@ const App = {
             <td>${tx.judul}<br><span style="font-size: 11px; color: #64748b;">${tx.kategori} • ${tx.metode}</span></td>
             <td style="font-weight: 700; color: #0d9488;">${ReportGenerator.formatRupiah(tx.nominal)}</td>
             <td>
-              <button class="btn-icon-action" title="Cetak Kwitansi" onclick="ReportGenerator.openKwitansi(${JSON.stringify(tx).replace(/"/g, '&quot;')})">
-                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-              </button>
+              <div style="display: flex; gap: 6px; align-items: center; justify-content: flex-end;">
+                ${(tx.buktiTransfer || tx.buktiFoto) ? `
+                  <button type="button" class="btn-outline-pill" style="padding: 2px 7px; font-size: 11px; color: #0f766e; border-color: #99f6e4; background: #f0fdfa;" title="Lihat Foto Bukti Transfer" onclick="App.previewBuktiTransfer('${tx.id}')">
+                    📸 Bukti
+                  </button>
+                ` : ''}
+                <button class="btn-icon-action" title="Cetak Kwitansi" onclick="ReportGenerator.openKwitansi(${JSON.stringify(tx).replace(/"/g, '&quot;')})">
+                  <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                </button>
+              </div>
             </td>
           `;
           txContainer.appendChild(tr);
@@ -5372,6 +5386,72 @@ const App = {
     }
   },
 
+  handleMetodeKonfirmasiChange(val) {
+    const badge = document.getElementById('badgeBuktiWajib');
+    if (!badge) return;
+    if (val === 'Titip Tunai ke Bendahara') {
+      badge.textContent = 'Opsional untuk Tunai';
+      badge.style.background = '#f1f5f9';
+      badge.style.color = '#64748b';
+    } else {
+      badge.textContent = 'Wajib untuk Transfer/QRIS';
+      badge.style.background = '#e0f2fe';
+      badge.style.color = '#0369a1';
+    }
+  },
+
+  handleBuktiTransferFileSelect(input) {
+    const file = input && input.files && input.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      alert("Silakan pilih file gambar (JPG, JPEG, PNG, atau WebP).");
+      input.value = '';
+      return;
+    }
+
+    // Kompres gambar otomatis agar hemat memori & cepat terunggah ke Google Drive
+    Utils.compressImage(file, 900, 0.75).then(base64 => {
+      const hiddenInput = document.getElementById('wargaKonfirmasiBuktiBase64');
+      if (hiddenInput) hiddenInput.value = base64;
+
+      const imgEl = document.getElementById('imgBuktiPreview');
+      if (imgEl) imgEl.src = base64;
+
+      const promptBox = document.getElementById('dropzoneBuktiPrompt');
+      const previewBox = document.getElementById('dropzoneBuktiPreview');
+      if (promptBox) promptBox.style.display = 'none';
+      if (previewBox) previewBox.style.display = 'block';
+    }).catch(err => {
+      console.warn("Kompresi gambar gagal:", err);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const base64 = e.target.result;
+        const hiddenInput = document.getElementById('wargaKonfirmasiBuktiBase64');
+        if (hiddenInput) hiddenInput.value = base64;
+        const imgEl = document.getElementById('imgBuktiPreview');
+        if (imgEl) imgEl.src = base64;
+        const promptBox = document.getElementById('dropzoneBuktiPrompt');
+        const previewBox = document.getElementById('dropzoneBuktiPreview');
+        if (promptBox) promptBox.style.display = 'none';
+        if (previewBox) previewBox.style.display = 'block';
+      };
+      reader.readAsDataURL(file);
+    });
+  },
+
+  removeBuktiTransfer() {
+    const fileInput = document.getElementById('inputBuktiTransferFile');
+    if (fileInput) fileInput.value = '';
+    const hiddenInput = document.getElementById('wargaKonfirmasiBuktiBase64');
+    if (hiddenInput) hiddenInput.value = '';
+    const imgEl = document.getElementById('imgBuktiPreview');
+    if (imgEl) imgEl.src = '';
+    const promptBox = document.getElementById('dropzoneBuktiPrompt');
+    const previewBox = document.getElementById('dropzoneBuktiPreview');
+    if (promptBox) promptBox.style.display = 'block';
+    if (previewBox) previewBox.style.display = 'none';
+  },
+
   openWargaBayarModal(year, month) {
     const curYear = year || AppState.wargaSelectedYear || AppState.selectedYear || new Date().getFullYear();
     const curMonth = month || AppState.selectedMonth || (new Date().getMonth() + 1);
@@ -5387,10 +5467,20 @@ const App = {
     if (inputYear) inputYear.value = curYear;
     if (inputMonth) inputMonth.value = curMonth;
 
+    const noteInput = document.getElementById('wargaKonfirmasiNote');
+    if (noteInput) noteInput.value = '';
+
+    const metodeSelect = document.getElementById('wargaKonfirmasiMetode');
+    if (metodeSelect) {
+      metodeSelect.value = 'Transfer Bank BCA';
+      this.handleMetodeKonfirmasiChange('Transfer Bank BCA');
+    }
+
+    this.removeBuktiTransfer();
     this.openModal('modalKonfirmasiWarga');
   },
 
-  submitKonfirmasiWarga() {
+  async submitKonfirmasiWarga() {
     const resident = (this.data.residents || []).find(r => r.id === AppState.currentResidentId) || this.data.residents[0];
     if (!resident) {
       alert("Akun warga tidak ditemukan.");
@@ -5401,14 +5491,33 @@ const App = {
     const curMonth = parseInt(document.getElementById('wargaKonfirmasiBulan')?.value, 10) || (new Date().getMonth() + 1);
     const metode = document.getElementById('wargaKonfirmasiMetode')?.value || 'Transfer Bank BCA';
     const note = (document.getElementById('wargaKonfirmasiNote')?.value || '').trim();
+    const buktiBase64 = (document.getElementById('wargaKonfirmasiBuktiBase64')?.value || '').trim();
     const monthlyFee = (this.data.settings && this.data.settings.iuranWajibBulanan) || 50000;
     const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
     const mName = monthNames[curMonth - 1] || 'Bulan';
 
+    // Validasi upload bukti transfer jika bukan tunai
+    if (metode !== 'Titip Tunai ke Bendahara' && !buktiBase64) {
+      const lanjut = confirm(
+        "⚠️ PERHATIAN:\n\n" +
+        "Anda memilih metode pembayaran non-tunai (" + metode + "), namun belum melampirkan foto bukti transfer atau QRIS.\n\n" +
+        "Mengunggah bukti transfer memudahkan Bendahara RT untuk langsung memverifikasi pembayaran Anda.\n\n" +
+        "Apakah Anda tetap ingin mengirim konfirmasi tanpa lampiran bukti transfer?"
+      );
+      if (!lanjut) return;
+    }
+
+    const btnSubmit = document.getElementById('btnSubmitKonfirmasiWarga');
+    const oldBtnText = btnSubmit ? btnSubmit.innerHTML : 'Kirim Konfirmasi';
+    if (btnSubmit) {
+      btnSubmit.disabled = true;
+      btnSubmit.innerHTML = '⏳ Menyimpan & Mengunggah...';
+    }
+
     // 1. Ubah status iuran warga menjadi Pending
     this.setDuesStatus(resident.id, curYear, curMonth, 'Pending');
 
-    // 2. Buat transaksi kas berstatus Pending dengan metode pembayaran mandiri (Transfer / QRIS)
+    // 2. Buat transaksi kas berstatus Pending dengan bukti transfer
     const todayStr = new Date().toISOString().slice(0, 10);
     const nowTimeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
     const kwitansiNo = `KW-IURAN-${resident.id}-${curYear}-${curMonth}-${Date.now().toString().slice(-4)}`;
@@ -5426,28 +5535,237 @@ const App = {
       periodeTahun: curYear,
       blok: resident.alamat,
       nominal: monthlyFee,
-      metode: metode, // Sesuai metode yang dipilih warga: 'Transfer Bank BCA' atau 'QRIS RT'
+      metode: metode,
       status: 'Pending',
       kwitansi: kwitansiNo,
       pencatat: `Warga Mandiri (${resident.nama})`,
       collectorId: 'mandiri',
-      statusSetoran: 'disetor_ke_bendahara'
+      statusSetoran: 'disetor_ke_bendahara',
+      buktiTransfer: buktiBase64
     };
+
+    // 3. Upload langsung ke Google Drive jika cloud sync terhubung
+    let driveUploadedUrl = null;
+    if (buktiBase64 && window.CloudSync && typeof window.CloudSync.uploadFileToDrive === 'function') {
+      try {
+        const cleanName = (resident.nama || 'warga').replace(/[^a-zA-Z0-9]/g, '_');
+        driveUploadedUrl = await window.CloudSync.uploadFileToDrive(
+          buktiBase64,
+          `Bukti_${cleanName}_${curYear}_${String(curMonth).padStart(2, '0')}`,
+          'Bukti Transfer Iuran'
+        );
+        if (driveUploadedUrl) {
+          newTx.buktiTransfer = driveUploadedUrl;
+        }
+      } catch (uploadErr) {
+        console.warn("Upload bukti ke Google Drive gagal, menyimpan lokal:", uploadErr);
+      }
+    }
 
     if (!Array.isArray(this.data.transactions)) this.data.transactions = [];
     this.data.transactions.unshift(newTx);
     DB.save(this.data);
 
-    if (window.CloudSync && typeof window.CloudSync.syncNow === 'function') {
+    // Kirim sinkronisasi langsung
+    if (window.CloudSync && typeof window.CloudSync.saveTransactionDirect === 'function') {
+      window.CloudSync.saveTransactionDirect(newTx);
+    } else if (window.CloudSync && typeof window.CloudSync.syncNow === 'function') {
       window.CloudSync.syncNow();
     }
 
+    if (btnSubmit) {
+      btnSubmit.disabled = false;
+      btnSubmit.innerHTML = oldBtnText;
+    }
+
     this.closeModal('modalKonfirmasiWarga');
+    this.removeBuktiTransfer();
     this.renderDashboard();
     this.renderWargaIuranHistory();
     this.updateNotificationBadge();
 
-    alert(`✅ Konfirmasi pembayaran iuran ${mName} ${curYear} berhasil dikirim!\n\nMetode: ${metode}\nStatus: Menunggu Verifikasi Bendahara RT.`);
+    const driveNotif = driveUploadedUrl
+      ? "\n☁️ Bukti pembayaran berhasil diunggah ke Google Drive RT!"
+      : (buktiBase64 ? "\n📸 Foto bukti pembayaran tersimpan pada sistem." : "");
+
+    alert(`✅ Konfirmasi pembayaran iuran ${mName} ${curYear} berhasil dikirim!\n\nMetode: ${metode}${driveNotif}\nStatus: Menunggu Verifikasi Bendahara RT.`);
+  },
+
+  previewWargaPendingBukti(year, month) {
+    const resident = (this.data.residents || []).find(r => r.id === AppState.currentResidentId) || this.data.residents[0];
+    if (!resident) return;
+    const yNum = Number(year);
+    const mNum = Number(month);
+    const tx = (this.data.transactions || []).find(t => 
+      t.residentId === resident.id && 
+      Number(t.periodeBulan) === mNum && 
+      Number(t.periodeTahun || 2026) === yNum && 
+      t.status === 'Pending'
+    );
+    if (tx) {
+      this.previewBuktiTransfer(tx.id);
+    } else {
+      alert("Data konfirmasi pembayaran untuk periode tersebut belum ditemukan.");
+    }
+  },
+
+  previewBuktiTransfer(txId) {
+    const tx = (this.data.transactions || []).find(t => String(t.id).trim() === String(txId).trim());
+    if (!tx) {
+      alert("Data transaksi tidak ditemukan.");
+      return;
+    }
+
+    const resident = (this.data.residents || []).find(r => r.id === tx.residentId);
+    const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+    const mName = tx.periodeBulan ? monthNames[tx.periodeBulan - 1] : '';
+
+    const detailBox = document.getElementById('previewBuktiDetails');
+    if (detailBox) {
+      let badgeCls = 'badge-keluar';
+      if (tx.status === 'Approved') badgeCls = 'badge-approved';
+      else if (tx.status === 'Pending') badgeCls = 'badge-pending';
+
+      detailBox.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">
+          <div>
+            <div style="font-weight: 800; font-size: 14px; color: #0f766e;">${tx.judul || 'Iuran Warga'}</div>
+            <div style="font-size: 11.5px; color: #64748b;">${resident ? `${resident.nama} (${resident.alamat})` : (tx.blok || '-')}</div>
+          </div>
+          <span class="badge-status ${badgeCls}">${tx.status === 'Pending' ? '⏳ Menunggu Verifikasi' : tx.status}</span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 6px; font-size: 11.5px; margin-top: 8px; background: #ffffff; padding: 8px 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
+          <div><strong>Nominal:</strong> <span style="color: #0d9488; font-weight: 800;">${ReportGenerator.formatRupiah(tx.nominal)}</span></div>
+          <div><strong>Metode:</strong> ${tx.metode}</div>
+          <div><strong>Periode:</strong> ${mName ? `${mName} ${tx.periodeTahun || ''}` : tx.tanggal}</div>
+          <div><strong>Waktu:</strong> ${tx.tanggal} ${tx.waktu || ''}</div>
+        </div>
+        ${tx.keterangan ? `<div style="font-size: 11.5px; color: #475569; margin-top: 6px;"><strong>Catatan Warga:</strong> ${tx.keterangan}</div>` : ''}
+      `;
+    }
+
+    const imgEl = document.getElementById('modalPreviewBuktiImg');
+    const emptyNotice = document.getElementById('previewBuktiEmptyNotice');
+    const btnDrive = document.getElementById('btnBukaBuktiDrive');
+    const boxDrive = document.getElementById('boxBukaBuktiDrive');
+
+    const buktiUrl = tx.buktiTransfer || tx.buktiFoto;
+    if (buktiUrl) {
+      if (imgEl) {
+        imgEl.src = buktiUrl;
+        imgEl.style.display = 'block';
+      }
+      if (emptyNotice) emptyNotice.style.display = 'none';
+
+      if (buktiUrl.startsWith('http://') || buktiUrl.startsWith('https://')) {
+        if (boxDrive) boxDrive.style.display = 'block';
+        if (btnDrive) btnDrive.href = buktiUrl;
+      } else {
+        if (boxDrive) boxDrive.style.display = 'none';
+      }
+    } else {
+      if (imgEl) {
+        imgEl.src = '';
+        imgEl.style.display = 'none';
+      }
+      if (emptyNotice) emptyNotice.style.display = 'block';
+      if (boxDrive) boxDrive.style.display = 'none';
+    }
+
+    // Aksi Pengurus: Setujui / Tolak jika status Pending
+    const actionsBox = document.getElementById('modalPreviewBuktiActions');
+    if (actionsBox) {
+      if (AppState.currentRole === 'pengurus' && tx.status === 'Pending') {
+        actionsBox.innerHTML = `
+          <button type="button" class="btn-outline-pill" style="color: #ef4444; border-color: #fca5a5; font-size: 12px; padding: 6px 14px;" onclick="App.rejectPendingTransaction('${tx.id}')">
+            ✗ Tolak Pembayaran
+          </button>
+          <button type="button" class="btn-teal-pill" style="font-size: 12px; padding: 6px 16px;" onclick="App.approvePendingTransaction('${tx.id}')">
+            ✓ Setujui & Lunaskan
+          </button>
+        `;
+      } else {
+        actionsBox.innerHTML = '';
+      }
+    }
+
+    this.openModal('modalPreviewBuktiTransfer');
+  },
+
+  approvePendingTransaction(txId) {
+    const tx = (this.data.transactions || []).find(t => String(t.id).trim() === String(txId).trim());
+    if (!tx) return;
+
+    const confirmApprove = confirm(`Apakah Anda yakin ingin MENYETUJUI dan MELUNASKAN pembayaran iuran ini?\n\n• Transaksi: ${tx.judul}\n• Nominal: ${ReportGenerator.formatRupiah(tx.nominal)}\n• Metode: ${tx.metode}`);
+    if (!confirmApprove) return;
+
+    tx.status = 'Approved';
+    tx.pencatat = `${this.data.settings.bendahara || 'Bendahara RT'} (Bendahara RT)`;
+
+    // Update dues matrix status
+    if (tx.residentId && tx.periodeBulan) {
+      this.setDuesStatus(tx.residentId, tx.periodeTahun || 2026, tx.periodeBulan, 'Lunas');
+    }
+
+    DB.save(this.data);
+
+    if (window.CloudSync && typeof window.CloudSync.saveTransactionDirect === 'function') {
+      window.CloudSync.saveTransactionDirect(tx);
+    }
+    if (window.CloudSync && typeof window.CloudSync.updateDuesDirect === 'function' && tx.residentId && tx.periodeBulan) {
+      window.CloudSync.updateDuesDirect(tx.residentId, tx.periodeBulan, 'Lunas');
+    }
+
+    this.closeModal('modalPreviewBuktiTransfer');
+    this.renderDuesMatrix();
+    this.renderDashboard();
+    this.renderTransactions();
+    this.renderFinancialReport();
+    this.updateNotificationBadge();
+
+    const resident = (this.data.residents || []).find(r => r.id === tx.residentId);
+    if (resident && resident.phone) {
+      const sendWa = confirm(`✓ Pembayaran iuran ${tx.judul} berhasil disetujui & berstatus LUNAS!\n\nApakah Anda ingin mengirimkan pesan konfirmasi / kwitansi ke WhatsApp warga (${resident.phone})?`);
+      if (sendWa) {
+        const msg = `Halo Bpk/Ibu ${resident.nama},\nPembayaran iuran ${tx.judul} sebesar ${ReportGenerator.formatRupiah(tx.nominal)} telah kami verifikasi dan dinyatakan LUNAS. Terima kasih atas partisipasinya! - Pengurus ${this.data.settings.rtName}`;
+        window.open(`https://wa.me/${resident.phone}?text=${encodeURIComponent(msg)}`, '_blank');
+      }
+    } else {
+      alert(`✓ Pembayaran iuran ${tx.judul} berhasil disetujui dan dinyatakan LUNAS!`);
+    }
+  },
+
+  rejectPendingTransaction(txId) {
+    const tx = (this.data.transactions || []).find(t => String(t.id).trim() === String(txId).trim());
+    if (!tx) return;
+
+    const confirmReject = confirm(`Apakah Anda yakin ingin MENOLAK konfirmasi pembayaran ini?\n\n• Transaksi: ${tx.judul}\n• Status warga akan dikembalikan menjadi "Belum Bayar" (✗).`);
+    if (!confirmReject) return;
+
+    tx.status = 'Batal';
+
+    // Kembalikan status matrix iuran menjadi Belum
+    if (tx.residentId && tx.periodeBulan) {
+      this.setDuesStatus(tx.residentId, tx.periodeTahun || 2026, tx.periodeBulan, 'Belum');
+    }
+
+    DB.save(this.data);
+
+    if (window.CloudSync && typeof window.CloudSync.saveTransactionDirect === 'function') {
+      window.CloudSync.saveTransactionDirect(tx);
+    }
+    if (window.CloudSync && typeof window.CloudSync.updateDuesDirect === 'function' && tx.residentId && tx.periodeBulan) {
+      window.CloudSync.updateDuesDirect(tx.residentId, tx.periodeBulan, 'Belum');
+    }
+
+    this.closeModal('modalPreviewBuktiTransfer');
+    this.renderDuesMatrix();
+    this.renderDashboard();
+    this.renderTransactions();
+    this.renderFinancialReport();
+    this.updateNotificationBadge();
+
+    alert(`Konfirmasi pembayaran ditolak. Status iuran warga telah dikembalikan menjadi "Belum Bayar".`);
   },
 
   // =========================================================================
