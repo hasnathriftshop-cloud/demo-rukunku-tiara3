@@ -1339,8 +1339,9 @@ body::after {
   background: #ffffff;
   border: 1px solid var(--border-light);
   border-radius: 20px;
-  overflow: hidden;
+  overflow-x: auto;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+  -webkit-overflow-scrolling: touch;
 }
 
 .app-table,
@@ -1403,9 +1404,142 @@ body::after {
 }
 
 .table-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 120px;
+}
+
+/* ==========================================================================
+   WARGA BATCH SELECTION ACTION BAR (Floating / Sticky Toolbar)
+   ========================================================================== */
+.warga-batch-action-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, #0f766e, #0d9488);
+  color: #ffffff;
+  padding: 10px 18px;
+  border-radius: 14px;
+  margin-bottom: 14px;
+  box-shadow: 0 4px 14px rgba(15, 118, 110, 0.28);
+  animation: slideDownFade 0.2s ease-out;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+@keyframes slideDownFade {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.batch-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.batch-count-badge {
+  background: rgba(255, 255, 255, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  padding: 3px 11px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.batch-name-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e6fffa;
+}
+
+.batch-buttons {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-batch-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.btn-batch-action:hover {
+  transform: translateY(-1.5px);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.18);
+}
+
+.btn-batch-teal {
+  background: #ffffff;
+  color: #0f766e;
+}
+.btn-batch-teal:hover {
+  background: #f0fdfa;
+  color: #0d9488;
+}
+
+.btn-batch-blue {
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+}
+.btn-batch-blue:hover {
+  background: #0284c7;
+  color: #ffffff;
+}
+
+.btn-batch-red {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecdd3;
+}
+.btn-batch-red:hover {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+.btn-batch-cancel {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 13px;
+  border: none;
+}
+.btn-batch-cancel:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.row-selected td {
+  background: #f0fdfa !important;
 }
 
 .btn-icon-action {
