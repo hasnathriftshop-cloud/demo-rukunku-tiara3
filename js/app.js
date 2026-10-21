@@ -106,17 +106,25 @@ const App = {
     if (AppState.currentUser) {
       this.showAppLayout();
       this.renderRoleUI();
-      this.renderChart();
-      this.renderDashboard();
-      this.renderResidents();
-      this.renderCategoryFilterOptions();
-      this.renderTransactions();
-      this.renderDuesMatrix();
-      this.renderSetoranBlok();
-      this.renderKelolaPetugasPage();
-      this.renderTalangan();
-      this.renderFinancialReport();
-      this.updateNotificationBadge();
+      if (AppState.currentRole === 'admin_masjid') {
+        this.renderMasjidDashboard();
+        this.renderMasjidKas();
+        this.renderMasjidAset();
+        this.renderMasjidLaporan();
+        this.switchTab('masjid-dashboard');
+      } else {
+        this.renderChart();
+        this.renderDashboard();
+        this.renderResidents();
+        this.renderCategoryFilterOptions();
+        this.renderTransactions();
+        this.renderDuesMatrix();
+        this.renderSetoranBlok();
+        this.renderKelolaPetugasPage();
+        this.renderTalangan();
+        this.renderFinancialReport();
+        this.updateNotificationBadge();
+      }
     } else {
       // Pastikan semua modal overlay tertutup saat pertama kali membuka layar login
       document.querySelectorAll('.modal-overlay').forEach(modal => {
@@ -319,6 +327,14 @@ const App = {
       this.renderSetoranBlok();
     } else if (tabName === 'kelola-petugas') {
       this.renderKelolaPetugasPage();
+    } else if (tabName === 'masjid-dashboard') {
+      this.renderMasjidDashboard();
+    } else if (tabName === 'masjid-kas') {
+      this.renderMasjidKas();
+    } else if (tabName === 'masjid-aset') {
+      this.renderMasjidAset();
+    } else if (tabName === 'masjid-laporan') {
+      this.renderMasjidLaporan();
     }
 
     // Reset search
@@ -449,6 +465,7 @@ const App = {
   },
 
   renderRoleUI() {
+    const isMasjid = AppState.currentRole === 'admin_masjid';
     const isPengurus = AppState.currentRole === 'pengurus';
     const isPetugas = AppState.currentRole === 'petugas';
     const rolePillText = document.getElementById('rolePillText');
@@ -460,7 +477,23 @@ const App = {
     const dashboardTitleText = document.getElementById('dashboardMainTitle');
     const dashboardSubText = document.getElementById('dashboardMainSubtitle');
 
-    if (isPengurus) {
+    if (isMasjid) {
+      const s = this.data.masjidSettings || {};
+      if (rolePillText) rolePillText.textContent = 'Mode: DKM Masjid Sabilillah';
+      if (userNameDisplay) userNameDisplay.textContent = s.ketuaDkm || 'DKM Sabilillah';
+      if (userRoleDisplay) userRoleDisplay.textContent = 'Admin / Bendahara Masjid';
+      if (avatarImg) avatarImg.textContent = 'MS';
+
+      if (dashboardTitleText) dashboardTitleText.textContent = 'Dashboard Kas Masjid Sabilillah';
+      if (dashboardSubText) dashboardSubText.textContent = 'Dewan Kemakmuran Masjid (DKM) • Transparansi Keuangan, Kotak Amal, & Aset';
+
+      // Show masjid-only controls, hide RT-specific controls
+      document.querySelectorAll('.masjid-only').forEach(el => el.style.display = '');
+      document.querySelectorAll('.pengurus-only').forEach(el => el.style.display = 'none');
+      document.querySelectorAll('.pengurus-petugas-only').forEach(el => el.style.display = 'none');
+      document.querySelectorAll('.petugas-only').forEach(el => el.style.display = 'none');
+      document.querySelectorAll('.warga-only').forEach(el => el.style.display = 'none');
+    } else if (isPengurus) {
       if (rolePillText) rolePillText.textContent = 'Mode: Bendahara / Pengurus RT';
       if (userNameDisplay) userNameDisplay.textContent = this.data.settings.ketuaRt || 'Pengurus RT';
       if (userRoleDisplay) userRoleDisplay.textContent = `Ketua / Pengurus ${this.data.settings.rtName || 'RT'}`;
@@ -474,6 +507,7 @@ const App = {
       document.querySelectorAll('.pengurus-petugas-only').forEach(el => el.style.display = '');
       document.querySelectorAll('.petugas-only').forEach(el => el.style.display = 'none');
       document.querySelectorAll('.warga-only').forEach(el => el.style.display = 'none');
+      document.querySelectorAll('.masjid-only').forEach(el => el.style.display = 'none');
     } else if (isPetugas) {
       const user = AppState.currentUser || {};
       const blokName = user.blokTugas || 'Blok';
@@ -490,6 +524,7 @@ const App = {
       document.querySelectorAll('.pengurus-petugas-only').forEach(el => el.style.display = '');
       document.querySelectorAll('.petugas-only').forEach(el => el.style.display = '');
       document.querySelectorAll('.warga-only').forEach(el => el.style.display = 'none');
+      document.querySelectorAll('.masjid-only').forEach(el => el.style.display = 'none');
     } else {
       // Warga Mode
       const currentResident = this.data.residents.find(r => r.id === AppState.currentResidentId) || this.data.residents[0];
@@ -509,9 +544,14 @@ const App = {
       document.querySelectorAll('.pengurus-petugas-only').forEach(el => el.style.display = 'none');
       document.querySelectorAll('.petugas-only').forEach(el => el.style.display = 'none');
       document.querySelectorAll('.warga-only').forEach(el => el.style.display = '');
+      document.querySelectorAll('.masjid-only').forEach(el => el.style.display = 'none');
     }
 
-    this.renderDashboard();
+    if (isMasjid) {
+      this.renderMasjidDashboard();
+    } else {
+      this.renderDashboard();
+    }
     this.updateNotificationBadge();
   },
 
@@ -1044,7 +1084,22 @@ const App = {
     const passInput = document.getElementById('authPassword');
     const hint = document.getElementById('authUsernameHint');
 
-    if (role === 'pengurus') {
+    if (role === 'admin_masjid') {
+      if (label) label.textContent = 'Username Admin Masjid *';
+      if (input) {
+        input.placeholder = 'Contoh: masjid atau takmir';
+      }
+      if (passInput) {
+        passInput.placeholder = 'Password akun masjid';
+      }
+      if (hint) {
+        hint.style.display = 'block';
+        hint.innerHTML = '💡 Default login: Username <strong>masjid</strong> &bull; Password <strong>123</strong>';
+        hint.style.color = '#047857';
+        hint.style.fontSize = '12px';
+        hint.style.marginTop = '6px';
+      }
+    } else if (role === 'pengurus') {
       if (label) label.textContent = 'Username Pengurus *';
       if (input) {
         input.placeholder = 'Contoh: admin atau nama petugas';
@@ -1073,7 +1128,13 @@ const App = {
 
   // Bantuan Pengisian Cepat Kredensial Demo
   fillDemoLogin(role) {
-    if (role === 'pengurus') {
+    if (role === 'admin_masjid') {
+      this.selectAuthRole('admin_masjid');
+      const u = document.getElementById('authUsername');
+      const p = document.getElementById('authPassword');
+      if (u) u.value = 'masjid';
+      if (p) p.value = '123';
+    } else if (role === 'pengurus') {
       this.selectAuthRole('pengurus');
       const u = document.getElementById('authUsername');
       const p = document.getElementById('authPassword');
@@ -1187,8 +1248,48 @@ const App = {
 
     const cleanPhoneInput = username.startsWith('0') ? '62' + username.slice(1) : (username.startsWith('+62') ? username.slice(1) : username);
 
-    if (role === 'pengurus') {
-      const admin = this.data.adminUser || { username: 'admin', password: '123' };
+    // Cek apakah kredensial yang dimasukkan adalah Pengurus RT:
+    const admin = this.data.adminUser || { username: 'admin', password: '123' };
+    const isAdminRt = (username.toLowerCase() === (admin.username || 'admin').toLowerCase()) && (pass === (admin.password || '123'));
+
+    // Cek apakah kredensial yang dimasukkan adalah Admin Masjid Sabilillah:
+    const masjidAdmin = this.data.masjidAdmin || { username: 'masjid', password: '123' };
+    const isMasjidUser = (username.toLowerCase() === (masjidAdmin.username || 'masjid').toLowerCase()) ||
+                         (username.toLowerCase() === 'admin_masjid') ||
+                         (username.toLowerCase() === 'takmir');
+
+    // Jika role admin_masjid atau username masjid
+    if ((role === 'admin_masjid' && !isAdminRt) || isMasjidUser) {
+      const validMasjidPass = masjidAdmin.password || '123';
+      if (pass !== validMasjidPass && pass !== '123') {
+        alert("Password akun Admin Masjid salah!\n\n💡 Default password: 123");
+        return;
+      }
+
+      this.selectAuthRole('admin_masjid');
+      const user = {
+        role: 'admin_masjid',
+        name: this.data.masjidSettings?.ketuaDkm || 'DKM Masjid Sabilillah',
+        username: masjidAdmin.username || 'masjid',
+        namaMasjid: this.data.masjidSettings?.nama || 'Masjid Sabilillah'
+      };
+      this.setAuthSession(user);
+
+      document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
+      this.showAppLayout();
+
+      this.renderRoleUI();
+      this.renderMasjidDashboard();
+      this.renderMasjidKas();
+      this.renderMasjidAset();
+      this.renderMasjidLaporan();
+
+      alert(`Selamat datang, ${user.name}!\nAnda berhasil masuk ke Dashboard Keuangan & Administrasi Masjid Sabilillah.`);
+      this.switchTab('masjid-dashboard');
+      return;
+    }
+
+    if (role === 'pengurus' || isAdminRt) {
       const collectors = this.data.collectors || [];
 
       // 1. Check if login as Ketua RT / Bendahara Umum (Super Admin)
@@ -1307,7 +1408,7 @@ const App = {
         }
       }
 
-      alert("Username atau password Pengurus / Petugas tidak ditemukan!\n\n💡 Petunjuk Akses:\n• Pengurus: Username 'admin', Password '123'\n• Warga: Pilih kartu 'Warga' lalu masukkan NIK atau No. WhatsApp Anda.\n• Atau klik tombol bantuan '🔑 Isi Akun Pengurus' / '👨‍👩‍👧‍👦 Isi Akun Warga' di bawah tombol login.");
+      alert("Username atau password tidak ditemukan!\n\n💡 Petunjuk Akses:\n• Pengurus RT: Username 'admin', Password '123'\n• Admin Masjid: Username 'masjid', Password '123'\n• Warga: Pilih kartu 'Warga' lalu masukkan NIK atau No. WhatsApp Anda.\n• Atau klik tombol bantuan 'Demo RT' / 'Demo Masjid' / 'Demo Warga' di bawah tombol login.");
       return;
     } else {
       // Fallback Cerdas: Jika memilih kartu Warga tapi memasukkan kredensial admin
@@ -5795,6 +5896,851 @@ const App = {
     } else {
       this.renderDashboard();
     }
+  },
+
+  // =========================================================================
+  // MASJID SABILILLAH CONTROLLER METHODS
+  // =========================================================================
+
+  renderMasjidDashboard() {
+    const s = this.data.masjidSettings || {};
+    const txs = this.data.masjidTransactions || [];
+    const assets = this.data.masjidAssets || [];
+
+    // Update hero profile information
+    const heroRek = document.getElementById('dkmHeroRekening');
+    if (heroRek) {
+      heroRek.textContent = `${s.noRekening || '712-345-6789'}`;
+    }
+    const dkmKetua = document.getElementById('dkmDisplayKetua');
+    if (dkmKetua) dkmKetua.textContent = s.ketuaDkm || 'H. Ahmad Fauzi';
+    const dkmBendahara = document.getElementById('dkmDisplayBendahara');
+    if (dkmBendahara) dkmBendahara.textContent = s.bendahara || 'H. Sudirman';
+    const dkmSekretaris = document.getElementById('dkmDisplaySekretaris');
+    if (dkmSekretaris) dkmSekretaris.textContent = s.sekretaris || 'Ust. M. Ridwan';
+    const dkmMarbot = document.getElementById('dkmDisplayMarbot');
+    if (dkmMarbot) dkmMarbot.textContent = s.marbot || 'Bpk. Subur & Bpk. Warsito';
+
+    // Calculate Balances
+    // Saldo Kas Umum = saldoAwal + (masuk kas umum) - (keluar kas umum)
+    let totalKasUmum = Number(s.saldoAwal || 0);
+    let totalPembangunan = 0;
+    let totalSosial = 0;
+    let totalInfaqJumatBulanIni = 0;
+    let totalKotakAhad = 0;
+
+    const now = new Date();
+    const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    let monthIn = 0;
+    let monthOut = 0;
+
+    txs.forEach(t => {
+      const nominal = Number(t.nominal || 0);
+      const isMasuk = t.tipe === 'masuk';
+      const kantong = t.kantong || 'Kas Umum';
+      const isThisMonth = (t.tanggal || '').startsWith(currentMonthStr);
+
+      // Month in / out
+      if (isThisMonth) {
+        if (isMasuk) monthIn += nominal;
+        else monthOut += nominal;
+      }
+
+      // By kantong
+      if (kantong === 'Kas Umum') {
+        if (isMasuk) totalKasUmum += nominal;
+        else totalKasUmum -= nominal;
+      } else if (kantong === 'Pembangunan') {
+        if (isMasuk) totalPembangunan += nominal;
+        else totalPembangunan -= nominal;
+      } else if (kantong === 'Sosial & ZIS') {
+        if (isMasuk) totalSosial += nominal;
+        else totalSosial -= nominal;
+      }
+
+      // Specific KPI categories
+      if (isMasuk && (t.kategori === 'Infaq Jumat' || (t.uraian && t.uraian.toLowerCase().includes('jumat')))) {
+        if (isThisMonth) totalInfaqJumatBulanIni += nominal;
+      }
+      if (isMasuk && (t.kategori === 'Kotak Jariyah Keliling Ahad' || (t.uraian && t.uraian.toLowerCase().includes('ahad')))) {
+        totalKotakAhad += nominal;
+      }
+    });
+
+    // Display Hero & KPI Cards
+    const elHeroSaldo = document.getElementById('masjidHeroSaldoKas');
+    if (elHeroSaldo) elHeroSaldo.textContent = Utils.formatRupiah(totalKasUmum);
+
+    const elHeroKotakAhad = document.getElementById('masjidHeroKotakAhad');
+    if (elHeroKotakAhad) elHeroKotakAhad.textContent = Utils.formatRupiah(totalKotakAhad);
+
+    const elKpiPembangunan = document.getElementById('masjidKpiPembangunan');
+    if (elKpiPembangunan) elKpiPembangunan.textContent = Utils.formatRupiah(totalPembangunan);
+
+    const elKpiSosial = document.getElementById('masjidKpiSosial');
+    if (elKpiSosial) elKpiSosial.textContent = Utils.formatRupiah(totalSosial);
+
+    const elKpiInfaqJumat = document.getElementById('masjidKpiInfaqJumat');
+    if (elKpiInfaqJumat) elKpiInfaqJumat.textContent = Utils.formatRupiah(totalInfaqJumatBulanIni);
+
+    const elKpiAsetCount = document.getElementById('masjidKpiAsetCount');
+    if (elKpiAsetCount) elKpiAsetCount.textContent = `${assets.length} Item`;
+
+    // Month Strip
+    const elMonthIn = document.getElementById('masjidMonthIn');
+    if (elMonthIn) elMonthIn.textContent = `+${Utils.formatRupiah(monthIn)}`;
+    const elMonthOut = document.getElementById('masjidMonthOut');
+    if (elMonthOut) elMonthOut.textContent = `-${Utils.formatRupiah(monthOut)}`;
+    const elMonthSurplus = document.getElementById('masjidMonthSurplus');
+    if (elMonthSurplus) {
+      const surplus = monthIn - monthOut;
+      elMonthSurplus.textContent = Utils.formatRupiah(surplus);
+      elMonthSurplus.style.color = surplus >= 0 ? '#0d9488' : '#be123c';
+    }
+
+    // 5 Recent Transactions
+    const sortedTxs = [...txs].sort((a, b) => new Date(b.tanggal || 0) - new Date(a.tanggal || 0));
+    const recent5 = sortedTxs.slice(0, 5);
+    const recentBody = document.getElementById('masjidRecentTxBody');
+    if (recentBody) {
+      if (recent5.length === 0) {
+        recentBody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: #94a3b8; padding: 20px;">Belum ada transaksi masjid tercatat.</td></tr>`;
+      } else {
+        recentBody.innerHTML = recent5.map(t => {
+          const isIn = t.tipe === 'masuk';
+          const sign = isIn ? '+' : '-';
+          const color = isIn ? '#16a34a' : '#dc2626';
+          let badgeKantong = '';
+          if (t.kantong === 'Pembangunan') badgeKantong = '<span class="badge-kantong badge-kantong-pembangunan">Pembangunan</span>';
+          else if (t.kantong === 'Sosial & ZIS') badgeKantong = '<span class="badge-kantong badge-kantong-sosial">Sosial & ZIS</span>';
+          else badgeKantong = '<span class="badge-kantong badge-kantong-umum">Kas Umum</span>';
+
+          return `
+            <tr>
+              <td style="font-size: 11.5px; color: #64748b; white-space: nowrap;">${t.tanggal || '-'}</td>
+              <td>
+                <div style="font-weight: 700; color: #1e293b; font-size: 12.5px;">${t.uraian || '-'}</div>
+                <div style="font-size: 11px; color: #64748b;">${t.kategori || ''} &bull; <span style="color: #0f766e;">${t.pihak || 'Jemaah'}</span></div>
+              </td>
+              <td>${badgeKantong}</td>
+              <td style="text-align: right; font-weight: 800; color: ${color}; font-size: 13px; white-space: nowrap;">
+                ${sign}${Utils.formatRupiah(t.nominal)}
+              </td>
+              <td style="text-align: center; font-size: 11px; color: #475569;">
+                <span style="background: #f1f5f9; padding: 3px 8px; border-radius: 6px;">${t.metode || 'Tunai'}</span>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      }
+    }
+  },
+
+  renderMasjidKas() {
+    const txs = this.data.masjidTransactions || [];
+    const tipeFilter = document.getElementById('filterMasjidTipe')?.value || 'all';
+    const kantongFilter = document.getElementById('filterMasjidKantong')?.value || 'all';
+    const kategoriFilter = document.getElementById('filterMasjidKategori')?.value || 'all';
+    const searchQuery = (document.getElementById('filterMasjidSearch')?.value || '').toLowerCase().trim();
+
+    let filtered = txs.filter(t => {
+      if (tipeFilter !== 'all' && t.tipe !== tipeFilter) return false;
+      if (kantongFilter !== 'all' && t.kantong !== kantongFilter) return false;
+      if (kategoriFilter !== 'all' && t.kategori !== kategoriFilter) return false;
+      if (searchQuery) {
+        const matchUraian = (t.uraian || '').toLowerCase().includes(searchQuery);
+        const matchKategori = (t.kategori || '').toLowerCase().includes(searchQuery);
+        const matchPihak = (t.pihak || '').toLowerCase().includes(searchQuery);
+        const matchMetode = (t.metode || '').toLowerCase().includes(searchQuery);
+        if (!matchUraian && !matchKategori && !matchPihak && !matchMetode) return false;
+      }
+      return true;
+    });
+
+    filtered.sort((a, b) => new Date(b.tanggal || 0) - new Date(a.tanggal || 0));
+
+    let sumMasuk = 0;
+    let sumKeluar = 0;
+    filtered.forEach(t => {
+      const nom = Number(t.nominal || 0);
+      if (t.tipe === 'masuk') sumMasuk += nom;
+      else sumKeluar += nom;
+    });
+
+    const elTotalMasuk = document.getElementById('masjidKasTotalMasuk');
+    if (elTotalMasuk) elTotalMasuk.textContent = Utils.formatRupiah(sumMasuk);
+    const elTotalKeluar = document.getElementById('masjidKasTotalKeluar');
+    if (elTotalKeluar) elTotalKeluar.textContent = Utils.formatRupiah(sumKeluar);
+    const elSaldoFilter = document.getElementById('masjidKasSaldoFilter');
+    if (elSaldoFilter) {
+      const net = sumMasuk - sumKeluar;
+      elSaldoFilter.textContent = Utils.formatRupiah(net);
+      elSaldoFilter.style.color = net >= 0 ? '#0d9488' : '#be123c';
+    }
+
+    const tbody = document.getElementById('masjidKasTableBody');
+    if (!tbody) return;
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: #94a3b8; padding: 24px;">Tidak ada transaksi kas masjid yang sesuai kriteria filter.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = filtered.map((t, idx) => {
+      const isMasuk = t.tipe === 'masuk';
+      const badgeTipe = isMasuk 
+        ? '<span class="badge-masjid-in">Masuk</span>' 
+        : '<span class="badge-masjid-out">Keluar</span>';
+      
+      let badgeKantong = '';
+      if (t.kantong === 'Pembangunan') badgeKantong = '<span class="badge-kantong badge-kantong-pembangunan">Pembangunan</span>';
+      else if (t.kantong === 'Sosial & ZIS') badgeKantong = '<span class="badge-kantong badge-kantong-sosial">Sosial & ZIS</span>';
+      else badgeKantong = '<span class="badge-kantong badge-kantong-umum">Kas Umum</span>';
+
+      const color = isMasuk ? '#16a34a' : '#be123c';
+      const sign = isMasuk ? '+' : '-';
+
+      return `
+        <tr>
+          <td style="text-align: center; font-size: 11px; color: #64748b;">${idx + 1}</td>
+          <td style="font-size: 11.5px; color: #334155; white-space: nowrap;"><strong>${t.tanggal || '-'}</strong></td>
+          <td>
+            <div style="display: flex; gap: 4px; align-items: center; flex-wrap: wrap;">
+              ${badgeTipe}
+              ${badgeKantong}
+            </div>
+          </td>
+          <td style="font-size: 11.5px; font-weight: 600; color: #475569;">${t.kategori || '-'}</td>
+          <td>
+            <div style="font-weight: 700; color: #1e293b; font-size: 12.5px;">${t.uraian || '-'}</div>
+            ${t.keterangan ? `<div style="font-size: 11px; color: #64748b; font-style: italic;">${t.keterangan}</div>` : ''}
+          </td>
+          <td style="font-size: 11.5px; color: #0f766e; font-weight: 600;">${t.pihak || '-'}</td>
+          <td style="text-align: right; font-weight: 800; color: ${color}; font-size: 13px; white-space: nowrap;">
+            ${sign}${Utils.formatRupiah(t.nominal)}
+          </td>
+          <td style="font-size: 11px; color: #475569;">
+            <span style="background: #f1f5f9; padding: 3px 8px; border-radius: 6px;">${t.metode || 'Tunai'}</span>
+          </td>
+          <td style="text-align: center; white-space: nowrap;">
+            ${isMasuk ? `
+              <button type="button" class="btn-outline-pill" style="font-size: 10.5px; padding: 3px 8px; color: #047857; border-color: #a7f3d0;" onclick="App.printKwitansiMasjid('${t.id}')" title="Cetak Kwitansi Infaq">
+                🧾 Kwitansi
+              </button>
+            ` : ''}
+            <button type="button" class="btn-outline-pill" style="font-size: 10.5px; padding: 3px 8px; color: #be123c; border-color: #fecdd3;" onclick="App.deleteMasjidTransaction('${t.id}')" title="Hapus Transaksi">
+              🗑️
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  },
+
+  renderMasjidAset() {
+    const assets = this.data.masjidAssets || [];
+    const katFilter = document.getElementById('filterMasjidAsetKat')?.value || 'all';
+    const kondisiFilter = document.getElementById('filterMasjidAsetKondisi')?.value || 'all';
+    const searchQuery = (document.getElementById('filterMasjidAsetSearch')?.value || '').toLowerCase().trim();
+
+    // Condition counts across all assets
+    let countBaik = 0;
+    let countRusakRingan = 0;
+    let countPerluGanti = 0;
+
+    assets.forEach(a => {
+      if (a.kondisi === 'Baik') countBaik++;
+      else if (a.kondisi === 'Rusak Ringan') countRusakRingan++;
+      else if (a.kondisi === 'Perlu Diganti') countPerluGanti++;
+    });
+
+    const elTot = document.getElementById('masjidAsetTotal');
+    if (elTot) elTot.textContent = `${assets.length} Item`;
+    const elBaik = document.getElementById('masjidAsetBaik');
+    if (elBaik) elBaik.textContent = `${countBaik} Item`;
+    const elRusak = document.getElementById('masjidAsetRusakRingan');
+    if (elRusak) elRusak.textContent = `${countRusakRingan} Item`;
+    const elGanti = document.getElementById('masjidAsetPerluGanti');
+    if (elGanti) elGanti.textContent = `${countPerluGanti} Item`;
+
+    let filtered = assets.filter(a => {
+      if (katFilter !== 'all' && a.kategori !== katFilter) return false;
+      if (kondisiFilter !== 'all' && a.kondisi !== kondisiFilter) return false;
+      if (searchQuery) {
+        const matchNama = (a.nama || '').toLowerCase().includes(searchQuery);
+        const matchLokasi = (a.lokasi || '').toLowerCase().includes(searchQuery);
+        const matchKet = (a.keterangan || '').toLowerCase().includes(searchQuery);
+        const matchSumber = (a.sumber || '').toLowerCase().includes(searchQuery);
+        if (!matchNama && !matchLokasi && !matchKet && !matchSumber) return false;
+      }
+      return true;
+    });
+
+    const tbody = document.getElementById('masjidAsetTableBody');
+    if (!tbody) return;
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #94a3b8; padding: 24px;">Tidak ada aset atau inventaris yang sesuai filter.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = filtered.map((a) => {
+      let badgeKondisi = '';
+      if (a.kondisi === 'Baik') badgeKondisi = '<span class="badge-kondisi-baik">🟢 Baik</span>';
+      else if (a.kondisi === 'Rusak Ringan') badgeKondisi = '<span class="badge-kondisi-rusak-ringan">🟡 Rusak Ringan</span>';
+      else badgeKondisi = '<span class="badge-kondisi-rusak-berat">🔴 Perlu Diganti</span>';
+
+      return `
+        <tr>
+          <td style="font-family: monospace; font-size: 11px; font-weight: 700; color: #047857;">${a.kode || a.id}</td>
+          <td>
+            <div style="font-weight: 700; color: #1e293b; font-size: 12.5px;">${a.nama || '-'}</div>
+            ${a.keterangan ? `<div style="font-size: 11px; color: #64748b;">${a.keterangan}</div>` : ''}
+          </td>
+          <td style="font-size: 11.5px; color: #475569;">${a.kategori || '-'}</td>
+          <td style="font-weight: 700; color: #0f172a; font-size: 12px;">${a.jumlah || '-'}</td>
+          <td>${badgeKondisi}</td>
+          <td style="font-size: 11.5px; color: #334155;">📍 ${a.lokasi || '-'}</td>
+          <td style="font-size: 11px; color: #64748b;">
+            <div>${a.tahun || '-'}</div>
+            <div style="color: #0f766e;">${a.sumber || ''}</div>
+          </td>
+          <td style="text-align: center; white-space: nowrap;">
+            <button type="button" class="btn-outline-pill" style="font-size: 11px; padding: 3px 8px; color: #047857; border-color: #a7f3d0;" onclick="App.openTambahAsetMasjidModal('${a.id}')" title="Edit Aset">
+              ✏️ Edit
+            </button>
+            <button type="button" class="btn-outline-pill" style="font-size: 11px; padding: 3px 8px; color: #be123c; border-color: #fecdd3;" onclick="App.deleteMasjidAset('${a.id}')" title="Hapus Aset">
+              🗑️
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  },
+
+  renderMasjidLaporan() {
+    const s = this.data.masjidSettings || {};
+    const txs = this.data.masjidTransactions || [];
+    const periodeSelect = document.getElementById('masjidLaporanPeriodeSelect')?.value || 'pekan_ini';
+
+    // Update Kop & Signatures
+    const elNama = document.getElementById('madingNamaMasjid');
+    if (elNama) elNama.textContent = `DEWAN KEMAKMURAN MASJID (DKM) ${s.nama || 'MASJID SABILILLAH'}`.toUpperCase();
+    const elAlamat = document.getElementById('madingAlamatMasjid');
+    if (elAlamat) elAlamat.textContent = s.alamat || '';
+    const elRek = document.getElementById('madingRekeningMasjid');
+    if (elRek) elRek.textContent = `Rekening Infaq Resmi ${s.bank || 'BSI'}: ${s.noRekening || ''} a.n ${s.atasNama || 'DKM Masjid Sabilillah'}`;
+
+    const elTtdKetua = document.getElementById('madingTtdKetua');
+    if (elTtdKetua) elTtdKetua.textContent = s.ketuaDkm || 'H. Ahmad Fauzi';
+    const elTtdBendahara = document.getElementById('madingTtdBendahara');
+    if (elTtdBendahara) elTtdBendahara.textContent = s.bendahara || 'H. Sudirman';
+
+    const today = new Date();
+    const dateStrOptions = { day: 'numeric', month: 'long', year: 'numeric' };
+    const elTglTtd = document.getElementById('madingTglTtd');
+    if (elTglTtd) elTglTtd.textContent = `Depok, ${today.toLocaleDateString('id-ID', dateStrOptions)}`;
+
+    // Filter Transactions by Periode
+    let filtered = [...txs];
+    const elPeriodeText = document.getElementById('madingPeriodeText');
+
+    if (periodeSelect === 'pekan_ini') {
+      // 7 days back from now
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(today.getDate() - 7);
+      const dateLimit = sevenDaysAgo.toISOString().slice(0, 10);
+      filtered = txs.filter(t => (t.tanggal || '') >= dateLimit);
+      if (elPeriodeText) {
+        elPeriodeText.textContent = `Periode: Pekan Berjalan (7 Hari Terakhir s/d ${today.toLocaleDateString('id-ID', dateStrOptions)})`;
+      }
+    } else if (periodeSelect === 'bulan_ini') {
+      const curMonthPrefix = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+      filtered = txs.filter(t => (t.tanggal || '').startsWith(curMonthPrefix));
+      const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+      if (elPeriodeText) {
+        elPeriodeText.textContent = `Periode: Bulan ${monthNames[today.getMonth()]} ${today.getFullYear()}`;
+      }
+    } else {
+      if (elPeriodeText) {
+        elPeriodeText.textContent = `Periode: Keseluruhan Buku Kas Masjid`;
+      }
+    }
+
+    // Calculate Balances
+    const saldoAwal = Number(s.saldoAwal || 0);
+    let totalMasuk = 0;
+    let totalKeluar = 0;
+    const listMasuk = [];
+    const listKeluar = [];
+
+    filtered.forEach(t => {
+      const nom = Number(t.nominal || 0);
+      if (t.tipe === 'masuk') {
+        totalMasuk += nom;
+        listMasuk.push(t);
+      } else {
+        totalKeluar += nom;
+        listKeluar.push(t);
+      }
+    });
+
+    // Calculate Overall Kantong Saldo for specific kantong footer
+    let totalPembangunan = 0;
+    let totalSosial = 0;
+    txs.forEach(t => {
+      const nom = Number(t.nominal || 0);
+      if (t.kantong === 'Pembangunan') {
+        totalPembangunan += (t.tipe === 'masuk' ? nom : -nom);
+      } else if (t.kantong === 'Sosial & ZIS') {
+        totalSosial += (t.tipe === 'masuk' ? nom : -nom);
+      }
+    });
+
+    const saldoAkhir = (periodeSelect === 'semua' ? saldoAwal : 0) + totalMasuk - totalKeluar;
+
+    const elSaldoAwal = document.getElementById('madingSaldoAwal');
+    if (elSaldoAwal) elSaldoAwal.textContent = Utils.formatRupiah(periodeSelect === 'semua' ? saldoAwal : 0);
+    const elTotMasuk = document.getElementById('madingTotalMasuk');
+    if (elTotMasuk) elTotMasuk.textContent = Utils.formatRupiah(totalMasuk);
+    const elTotKeluar = document.getElementById('madingTotalKeluar');
+    if (elTotKeluar) elTotKeluar.textContent = Utils.formatRupiah(totalKeluar);
+    const elSaldoAkhir = document.getElementById('madingSaldoAkhir');
+    if (elSaldoAkhir) elSaldoAkhir.textContent = Utils.formatRupiah(saldoAkhir);
+
+    const elSubIn = document.getElementById('madingSubtotalIn');
+    if (elSubIn) elSubIn.textContent = `Subtotal: ${Utils.formatRupiah(totalMasuk)}`;
+    const elSubOut = document.getElementById('madingSubtotalOut');
+    if (elSubOut) elSubOut.textContent = `Subtotal: ${Utils.formatRupiah(totalKeluar)}`;
+
+    const elKhususPembangunan = document.getElementById('madingKhususPembangunan');
+    if (elKhususPembangunan) elKhususPembangunan.textContent = Utils.formatRupiah(totalPembangunan);
+    const elKhususSosial = document.getElementById('madingKhususSosial');
+    if (elKhususSosial) elKhususSosial.textContent = Utils.formatRupiah(totalSosial);
+
+    // Render Table Masuk
+    const tbodyIn = document.getElementById('madingTableMasuk');
+    if (tbodyIn) {
+      if (listMasuk.length === 0) {
+        tbodyIn.innerHTML = `<tr><td colspan="4" style="padding: 8px; text-align: center; color: #94a3b8; font-style: italic;">Tidak ada penerimaan pada periode ini.</td></tr>`;
+      } else {
+        tbodyIn.innerHTML = listMasuk.map(t => `
+          <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 5px 6px; white-space: nowrap;">${t.tanggal || '-'}</td>
+            <td style="padding: 5px 6px;">
+              <strong>${t.kategori || ''}</strong> &bull; ${t.uraian || ''}
+            </td>
+            <td style="padding: 5px 6px; color: #047857;">${t.pihak || 'Jemaah'}</td>
+            <td style="padding: 5px 6px; text-align: right; font-weight: 700; color: #16a34a; white-space: nowrap;">
+              ${Utils.formatRupiah(t.nominal)}
+            </td>
+          </tr>
+        `).join('');
+      }
+    }
+
+    // Render Table Keluar
+    const tbodyOut = document.getElementById('madingTableKeluar');
+    if (tbodyOut) {
+      if (listKeluar.length === 0) {
+        tbodyOut.innerHTML = `<tr><td colspan="4" style="padding: 8px; text-align: center; color: #94a3b8; font-style: italic;">Tidak ada pengeluaran pada periode ini.</td></tr>`;
+      } else {
+        tbodyOut.innerHTML = listKeluar.map(t => `
+          <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 5px 6px; white-space: nowrap;">${t.tanggal || '-'}</td>
+            <td style="padding: 5px 6px;">
+              <strong>${t.kategori || ''}</strong> &bull; ${t.uraian || ''}
+            </td>
+            <td style="padding: 5px 6px; color: #64748b;">${t.pihak || '-'}</td>
+            <td style="padding: 5px 6px; text-align: right; font-weight: 700; color: #be123c; white-space: nowrap;">
+              ${Utils.formatRupiah(t.nominal)}
+            </td>
+          </tr>
+        `).join('');
+      }
+    }
+  },
+
+  openCatatKasMasjidModal(tipe = 'masuk', defaultKategori = '') {
+    const modal = document.getElementById('modalCatatKasMasjid');
+    if (!modal) return;
+
+    const today = new Date().toISOString().slice(0, 10);
+    const tglInput = document.getElementById('masjidTxTanggal');
+    if (tglInput) tglInput.value = today;
+
+    const judulInput = document.getElementById('masjidTxJudul');
+    if (judulInput) judulInput.value = '';
+
+    const nominalInput = document.getElementById('masjidTxNominal');
+    if (nominalInput) nominalInput.value = '';
+
+    const pihakInput = document.getElementById('masjidTxPihak');
+    if (pihakInput) pihakInput.value = '';
+
+    const ketInput = document.getElementById('masjidTxKeterangan');
+    if (ketInput) ketInput.value = '';
+
+    this.setMasjidModalTipe(tipe, defaultKategori);
+    modal.classList.add('active');
+  },
+
+  setMasjidModalTipe(tipe, defaultKategori = '') {
+    const inputTipe = document.getElementById('masjidTxTipe');
+    if (inputTipe) inputTipe.value = tipe;
+
+    const btnIn = document.getElementById('btnMasjidTipeIn');
+    const btnOut = document.getElementById('btnMasjidTipeOut');
+    const pihakLabel = document.getElementById('masjidTxPihakLabel');
+    const titleEl = document.getElementById('modalKasMasjidTitle');
+    const katSelect = document.getElementById('masjidTxKategori');
+
+    if (tipe === 'masuk') {
+      if (btnIn) {
+        btnIn.className = 'btn-teal-pill';
+        btnIn.style.background = '#047857';
+        btnIn.style.color = '#ffffff';
+      }
+      if (btnOut) {
+        btnOut.className = 'btn-outline-pill';
+        btnOut.style.background = 'transparent';
+        btnOut.style.color = '#be123c';
+      }
+      if (pihakLabel) pihakLabel.textContent = 'Nama Donatur / Penyetor Jemaah';
+      if (titleEl) titleEl.textContent = 'Penerimaan Kas Masjid (Infaq & Donasi)';
+
+      if (katSelect) {
+        katSelect.innerHTML = `
+          <option value="Kotak Amal Masjid">Kotak Amal Masjid</option>
+          <option value="Kotak Jariyah Keliling Ahad">Kotak Jariyah Keliling Ahad</option>
+          <option value="Infaq Jumat">Infaq Shalat Jumat</option>
+          <option value="Infaq/Donasi Tetap Hamba Allah">Infaq/Donasi Tetap Hamba Allah</option>
+          <option value="Dana Wakaf / Jariyah Pembangunan">Dana Wakaf / Pembangunan</option>
+          <option value="Zakat, Infak, dan Sedekah (ZIS)">Zakat, Infak, Sedekah (ZIS)</option>
+          <option value="Donasi PHBI / Acara Islam">Donasi Acara PHBI & Maulid</option>
+          <option value="Lainnya">Penerimaan Lainnya</option>
+        `;
+      }
+    } else {
+      if (btnIn) {
+        btnIn.className = 'btn-outline-pill';
+        btnIn.style.background = 'transparent';
+        btnIn.style.color = '#047857';
+      }
+      if (btnOut) {
+        btnOut.className = 'btn-teal-pill';
+        btnOut.style.background = '#be123c';
+        btnOut.style.color = '#ffffff';
+      }
+      if (pihakLabel) pihakLabel.textContent = 'Nama Penerima / Toko / Marbot';
+      if (titleEl) titleEl.textContent = 'Pencatatan Pengeluaran Kas Masjid';
+
+      if (katSelect) {
+        katSelect.innerHTML = `
+          <option value="Utilitas Masjid">Utilitas (Listrik PLN, PDAM, WiFi)</option>
+          <option value="Honor & Insentif Marbot/Imam/Muazin">Honor Marbot, Imam & Muazin</option>
+          <option value="Perlengkapan Kebersihan & Sanitasi">Perlengkapan Kebersihan & Pewangi</option>
+          <option value="Perbaikan & Maintenance Inventaris">Servis AC, Sound System & Pompa</option>
+          <option value="Konsumsi & Kegiatan Sosial">Konsumsi Pengajian, Takjil & Kajian</option>
+          <option value="Santunan Anak Yatim / Dhuafa">Santunan Yatim & Bantuan Dhuafa</option>
+          <option value="Biaya Pembangunan & Renovasi">Bahan Bangunan & Biaya Tukang</option>
+          <option value="Lainnya">Pengeluaran Lainnya</option>
+        `;
+      }
+    }
+
+    if (defaultKategori && katSelect) {
+      katSelect.value = defaultKategori;
+    }
+  },
+
+  saveCatatKasMasjidModal(event) {
+    event.preventDefault();
+    const tipe = document.getElementById('masjidTxTipe')?.value || 'masuk';
+    const kantong = document.getElementById('masjidTxKantong')?.value || 'Kas Umum';
+    const kategori = document.getElementById('masjidTxKategori')?.value || 'Lainnya';
+    const judul = (document.getElementById('masjidTxJudul')?.value || '').trim();
+    const tanggal = document.getElementById('masjidTxTanggal')?.value || new Date().toISOString().slice(0, 10);
+    const nominal = Number(document.getElementById('masjidTxNominal')?.value || 0);
+    const pihak = (document.getElementById('masjidTxPihak')?.value || '').trim() || (tipe === 'masuk' ? 'Hamba Allah' : 'DKM');
+    const metode = document.getElementById('masjidTxMetode')?.value || 'Tunai';
+    const keterangan = (document.getElementById('masjidTxKeterangan')?.value || '').trim();
+
+    if (!judul || nominal <= 0) {
+      alert("Harap lengkapi uraian transaksi dan nominal yang valid!");
+      return;
+    }
+
+    const txId = `MSJ-${tanggal.replace(/-/g, '')}-${String(Date.now()).slice(-4)}`;
+    const newTx = {
+      id: txId,
+      tanggal,
+      tipe,
+      kantong,
+      kategori,
+      uraian: judul,
+      pihak,
+      nominal,
+      metode,
+      keterangan
+    };
+
+    if (!this.data.masjidTransactions) this.data.masjidTransactions = [];
+    this.data.masjidTransactions.unshift(newTx);
+    DB.save(this.data);
+
+    this.closeModal('modalCatatKasMasjid');
+    this.renderMasjidDashboard();
+    this.renderMasjidKas();
+    this.renderMasjidLaporan();
+
+    if (tipe === 'masuk') {
+      if (confirm(`✅ Transaksi berhasil dicatat!\n\nNomor: ${txId}\nUraian: ${judul}\nNominal: ${Utils.formatRupiah(nominal)}\n\nApakah Anda ingin melihat & mencetak tanda terima / kwitansi sekarang?`)) {
+        this.printKwitansiMasjid(txId);
+      }
+    } else {
+      alert(`✅ Pengeluaran kas masjid berhasil disimpan!\n\nNomor: ${txId}\nUraian: ${judul}\nNominal: ${Utils.formatRupiah(nominal)}`);
+    }
+  },
+
+  deleteMasjidTransaction(id) {
+    const tx = (this.data.masjidTransactions || []).find(t => t.id === id);
+    if (!tx) return;
+
+    if (confirm(`Yakin ingin menghapus transaksi ini?\n\n"${tx.uraian}" (${Utils.formatRupiah(tx.nominal)})`)) {
+      this.data.masjidTransactions = (this.data.masjidTransactions || []).filter(t => t.id !== id);
+      DB.save(this.data);
+      this.renderMasjidDashboard();
+      this.renderMasjidKas();
+      this.renderMasjidLaporan();
+      alert("Transaksi berhasil dihapus.");
+    }
+  },
+
+  openTambahAsetMasjidModal(editId = null) {
+    const modal = document.getElementById('modalKelolaAsetMasjid');
+    if (!modal) return;
+
+    const idInput = document.getElementById('masjidAsetId');
+    const namaInput = document.getElementById('masjidAsetNama');
+    const katSelect = document.getElementById('masjidAsetKategori');
+    const jmlInput = document.getElementById('masjidAsetJumlah');
+    const kondisiSelect = document.getElementById('masjidAsetKondisi');
+    const lokasiInput = document.getElementById('masjidAsetLokasi');
+    const tahunInput = document.getElementById('masjidAsetTahun');
+    const sumberInput = document.getElementById('masjidAsetSumber');
+    const ketInput = document.getElementById('masjidAsetKeterangan');
+    const title = document.getElementById('modalAsetTitle');
+
+    if (editId) {
+      const asset = (this.data.masjidAssets || []).find(a => a.id === editId);
+      if (asset) {
+        if (idInput) idInput.value = asset.id;
+        if (namaInput) namaInput.value = asset.nama || '';
+        if (katSelect) katSelect.value = asset.kategori || 'Fisik, Ibadah & Perlengkapan';
+        if (jmlInput) jmlInput.value = asset.jumlah || '';
+        if (kondisiSelect) kondisiSelect.value = asset.kondisi || 'Baik';
+        if (lokasiInput) lokasiInput.value = asset.lokasi || '';
+        if (tahunInput) tahunInput.value = asset.tahun || '';
+        if (sumberInput) sumberInput.value = asset.sumber || '';
+        if (ketInput) ketInput.value = asset.keterangan || '';
+        if (title) title.innerHTML = '<span>✏️</span><span>Edit Data Aset Masjid</span>';
+      }
+    } else {
+      if (idInput) idInput.value = '';
+      if (namaInput) namaInput.value = '';
+      if (katSelect) katSelect.value = 'Fisik, Ibadah & Perlengkapan';
+      if (jmlInput) jmlInput.value = '';
+      if (kondisiSelect) kondisiSelect.value = 'Baik';
+      if (lokasiInput) lokasiInput.value = '';
+      if (tahunInput) tahunInput.value = new Date().getFullYear();
+      if (sumberInput) sumberInput.value = 'Kas Masjid';
+      if (ketInput) ketInput.value = '';
+      if (title) title.innerHTML = '<span>📦</span><span>Tambah Aset / Inventaris Masjid</span>';
+    }
+
+    modal.classList.add('active');
+  },
+
+  saveAsetMasjidModal(event) {
+    event.preventDefault();
+    const id = document.getElementById('masjidAsetId')?.value;
+    const nama = (document.getElementById('masjidAsetNama')?.value || '').trim();
+    const kategori = document.getElementById('masjidAsetKategori')?.value || 'Fisik, Ibadah & Perlengkapan';
+    const jumlah = (document.getElementById('masjidAsetJumlah')?.value || '').trim();
+    const kondisi = document.getElementById('masjidAsetKondisi')?.value || 'Baik';
+    const lokasi = (document.getElementById('masjidAsetLokasi')?.value || '').trim();
+    const tahun = (document.getElementById('masjidAsetTahun')?.value || '').trim();
+    const sumber = (document.getElementById('masjidAsetSumber')?.value || '').trim();
+    const keterangan = (document.getElementById('masjidAsetKeterangan')?.value || '').trim();
+
+    if (!nama || !jumlah || !lokasi) {
+      alert("Harap lengkapi nama aset, jumlah/volume, dan lokasi penyimpanan!");
+      return;
+    }
+
+    if (!this.data.masjidAssets) this.data.masjidAssets = [];
+
+    if (id) {
+      const existing = this.data.masjidAssets.find(a => a.id === id);
+      if (existing) {
+        existing.nama = nama;
+        existing.kategori = kategori;
+        existing.jumlah = jumlah;
+        existing.kondisi = kondisi;
+        existing.lokasi = lokasi;
+        existing.tahun = tahun;
+        existing.sumber = sumber;
+        existing.keterangan = keterangan;
+      }
+    } else {
+      const nextSeq = this.data.masjidAssets.length + 1;
+      const newId = `AST-${String(nextSeq).padStart(3, '0')}`;
+      this.data.masjidAssets.push({
+        id: newId,
+        kode: newId,
+        nama,
+        kategori,
+        jumlah,
+        kondisi,
+        lokasi,
+        tahun,
+        sumber,
+        keterangan
+      });
+    }
+
+    DB.save(this.data);
+    this.closeModal('modalKelolaAsetMasjid');
+    this.renderMasjidAset();
+    this.renderMasjidDashboard();
+    alert("Data inventaris aset masjid berhasil disimpan!");
+  },
+
+  deleteMasjidAset(id) {
+    const asset = (this.data.masjidAssets || []).find(a => a.id === id);
+    if (!asset) return;
+
+    if (confirm(`Yakin ingin menghapus aset "${asset.nama}"?`)) {
+      this.data.masjidAssets = (this.data.masjidAssets || []).filter(a => a.id !== id);
+      DB.save(this.data);
+      this.renderMasjidAset();
+      this.renderMasjidDashboard();
+      alert("Aset berhasil dihapus.");
+    }
+  },
+
+  openPengaturanMasjidModal() {
+    const s = this.data.masjidSettings || {};
+    const modal = document.getElementById('modalPengaturanMasjid');
+    if (!modal) return;
+
+    const namaIn = document.getElementById('settingMasjidNama');
+    if (namaIn) namaIn.value = s.nama || 'Masjid Sabilillah';
+    const alamatIn = document.getElementById('settingMasjidAlamat');
+    if (alamatIn) alamatIn.value = s.alamat || '';
+    const ketuaIn = document.getElementById('settingMasjidKetua');
+    if (ketuaIn) ketuaIn.value = s.ketuaDkm || '';
+    const bendaharaIn = document.getElementById('settingMasjidBendahara');
+    if (bendaharaIn) bendaharaIn.value = s.bendahara || '';
+    const sekIn = document.getElementById('settingMasjidSekretaris');
+    if (sekIn) sekIn.value = s.sekretaris || '';
+    const marbotIn = document.getElementById('settingMasjidMarbot');
+    if (marbotIn) marbotIn.value = s.marbot || '';
+    const rekIn = document.getElementById('settingMasjidRekening');
+    if (rekIn) rekIn.value = `${s.bank || 'BSI'} ${s.noRekening || ''} a.n ${s.atasNama || 'DKM'}`;
+    const waIn = document.getElementById('settingMasjidWa');
+    if (waIn) waIn.value = s.teleponWa || '';
+
+    modal.classList.add('active');
+  },
+
+  savePengaturanMasjid(event) {
+    event.preventDefault();
+    if (!this.data.masjidSettings) this.data.masjidSettings = {};
+    const s = this.data.masjidSettings;
+
+    s.nama = document.getElementById('settingMasjidNama')?.value.trim() || s.nama;
+    s.alamat = document.getElementById('settingMasjidAlamat')?.value.trim() || s.alamat;
+    s.ketuaDkm = document.getElementById('settingMasjidKetua')?.value.trim() || s.ketuaDkm;
+    s.bendahara = document.getElementById('settingMasjidBendahara')?.value.trim() || s.bendahara;
+    s.sekretaris = document.getElementById('settingMasjidSekretaris')?.value.trim() || s.sekretaris;
+    s.marbot = document.getElementById('settingMasjidMarbot')?.value.trim() || s.marbot;
+
+    const rawRek = document.getElementById('settingMasjidRekening')?.value.trim() || '';
+    if (rawRek) {
+      s.noRekening = rawRek;
+    }
+    s.teleponWa = document.getElementById('settingMasjidWa')?.value.trim() || s.teleponWa;
+
+    DB.save(this.data);
+    this.closeModal('modalPengaturanMasjid');
+    this.renderMasjidDashboard();
+    this.renderMasjidKas();
+    this.renderMasjidLaporan();
+    alert("Pengaturan profil DKM Masjid Sabilillah berhasil diperbarui!");
+  },
+
+  printKwitansiMasjid(txId) {
+    const tx = (this.data.masjidTransactions || []).find(t => t.id === txId);
+    if (!tx) return;
+    const s = this.data.masjidSettings || {};
+
+    const noEl = document.getElementById('kwitansiMasjidNo');
+    if (noEl) noEl.textContent = `NO: ${tx.id || 'MSJ-KW-001'}`;
+    const donaturEl = document.getElementById('kwitansiMasjidDonatur');
+    if (donaturEl) donaturEl.textContent = tx.pihak || 'Hamba Allah';
+    const nomEl = document.getElementById('kwitansiMasjidNominal');
+    if (nomEl) nomEl.textContent = Utils.formatRupiah(tx.nominal);
+    const kantongEl = document.getElementById('kwitansiMasjidKantong');
+    if (kantongEl) kantongEl.textContent = tx.kantong || 'Kas Umum';
+    const katEl = document.getElementById('kwitansiMasjidKategori');
+    if (katEl) katEl.textContent = `${tx.kategori || ''} - ${tx.uraian || ''}`;
+    const tglEl = document.getElementById('kwitansiMasjidTanggal');
+    if (tglEl) tglEl.textContent = tx.tanggal || '';
+    const metEl = document.getElementById('kwitansiMasjidMetode');
+    if (metEl) metEl.textContent = tx.metode || 'Tunai';
+    const ttdEl = document.getElementById('kwitansiMasjidTtd');
+    if (ttdEl) ttdEl.textContent = s.bendahara || 'Bendahara DKM';
+
+    const modal = document.getElementById('modalKwitansiMasjid');
+    if (modal) modal.classList.add('active');
+  },
+
+  cetakKwitansiMasjidWindow() {
+    const printArea = document.getElementById('kwitansiMasjidPrintArea');
+    if (!printArea) return;
+    const printContents = printArea.innerHTML;
+
+    const printWindow = window.open('', '_blank', 'width=600,height=600');
+    if (printWindow) {
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Kwitansi Infaq Masjid Sabilillah</title>
+            <style>
+              body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 20px; }
+              table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+              td { padding: 6px 4px; }
+            </style>
+          </head>
+          <body>
+            ${printContents}
+            <script>
+              window.onload = function() { window.print(); window.close(); }
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    } else {
+      window.print();
+    }
+  },
+
+  printLaporanMadingJumat() {
+    window.print();
   },
 
   // Modal helpers
