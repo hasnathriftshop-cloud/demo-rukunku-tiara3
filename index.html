@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
   <!-- Custom Modern Stylesheet -->
-  <link rel="stylesheet" href="css/style.css?v=20261021_04">
+  <link rel="stylesheet" href="css/style.css?v=20261021_05">
 </head>
 <body>
 
@@ -540,7 +540,7 @@
           <!-- Filter Bar -->
           <div class="action-filter-bar">
             <div class="filter-group">
-              <select id="filterBlokSelect" class="select-filter" onchange="App.renderResidents()">
+              <select id="filterBlokSelect" class="select-filter" onchange="if (window.AppState) AppState.wargaPage = 1; App.renderResidents(1);">
                 <option value="all">Semua Blok Lingkungan</option>
               </select>
             </div>
@@ -565,6 +565,16 @@
                 <!-- Dynamically populated -->
               </tbody>
             </table>
+          </div>
+
+          <!-- Pagination Bar (Halaman 1, 2, 3 dst) -->
+          <div id="wargaPagination" class="pagination-bar" style="display: none;">
+            <div id="wargaPaginationInfo" class="pagination-info">
+              Menampilkan data warga...
+            </div>
+            <div id="wargaPaginationControls" class="pagination-controls">
+              <!-- Dynamically populated buttons -->
+            </div>
           </div>
         </section>
 
@@ -1860,10 +1870,10 @@
   </div>
 
   <!-- Scripts with cache-busting -->
-  <script src="js/data.js?v=20261021_04"></script>
-  <script src="js/cloud-sync.js?v=20261021_04"></script>
-  <script src="js/report-pdf.js?v=20261021_04"></script>
-  <script src="js/app.js?v=20261021_04"></script>
+  <script src="js/data.js?v=20261021_05"></script>
+  <script src="js/cloud-sync.js?v=20261021_05"></script>
+  <script src="js/report-pdf.js?v=20261021_05"></script>
+  <script src="js/app.js?v=20261021_05"></script>
 
   <script>
     // Set default date picker values to today (bulletproof ready check)
