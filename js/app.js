@@ -17,7 +17,9 @@ const AppState = {
   selectedMonth: new Date().getMonth() + 1, // Otomatis bulan berjalan (1-12)
   selectedYear: new Date().getFullYear(),   // Otomatis tahun berjalan (misal 2026, dan otomatis 2027 saat 1 Jan 2027)
   wargaSelectedYear: new Date().getFullYear(),
-  chartHighlightIndex: 8 // Day 9 (0-indexed)
+  chartHighlightIndex: 8, // Day 9 (0-indexed)
+  wargaPage: 1,
+  wargaPageSize: 10
 };
 window.AppState = AppState;
 
@@ -1846,9 +1848,15 @@ const App = {
   // =========================================================================
   // Data Warga (Administrasi KK)
   // =========================================================================
-  renderResidents() {
+  renderResidents(targetPage) {
     const tableBody = document.getElementById('residentsTableBody');
     if (!tableBody) return;
+
+    if (typeof targetPage === 'number') {
+      AppState.wargaPage = targetPage;
+    } else if (!AppState.wargaPage) {
+      AppState.wargaPage = 1;
+    }
 
     tableBody.innerHTML = '';
     let filtered = this.data.residents || [];
@@ -1874,78 +1882,194 @@ const App = {
       );
     }
 
+    const totalItems = filtered.length;
+    const pageSize = AppState.wargaPageSize || 10;
+    const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+
+    if (AppState.wargaPage > totalPages) AppState.wargaPage = totalPages;
+    if (AppState.wargaPage < 1) AppState.wargaPage = 1;
+
     const totalCountEl = document.getElementById('totalWargaCount');
     if (totalCountEl) {
       if (AppState.currentRole === 'petugas') {
-        totalCountEl.textContent = `${filtered.length} KK di bawah koordinasi ${AppState.currentUser.blokTugas}`;
+        totalCountEl.textContent = `${totalItems} KK di bawah koordinasi ${AppState.currentUser.blokTugas}`;
       } else {
-        totalCountEl.textContent = `${filtered.length} Kepala Keluarga Terdaftar di ${this.data.settings.rtName}`;
+        totalCountEl.textContent = `${totalItems} Kepala Keluarga Terdaftar di ${this.data.settings.rtName}`;
       }
     }
 
-    filtered.forEach((r, idx) => {
-      const tr = document.createElement('tr');
-      const waLink = `https://wa.me/${r.phone}?text=${encodeURIComponent(`Halo Bpk/Ibu ${r.nama} (Warga ${r.alamat}), salam dari Pengurus ${this.data.settings.rtName}.`)}`;
+    const startIndex = (AppState.wargaPage - 1) * pageSize;
+    const endIndex = Math.min(startIndex + pageSize, totalItems);
+    const pageItems = filtered.slice(startIndex, endIndex);
 
-      tr.innerHTML = `
-        <td style="text-align: center; color: var(--text-muted);">${idx + 1}</td>
-        <td>
-          <div class="table-resident-name">
-            <div class="avatar-img" style="width: 32px; height: 32px; font-size: 11px;">
-              ${r.nama.split(' ').map(n=>n[0]).join('').slice(0, 2)}
-            </div>
-            <div>
-              <strong>${r.nama}</strong><br>
-              <span style="font-size: 11px; color: #64748b;">NIK: ${r.nik || '-'}</span>
-            </div>
-          </div>
-        </td>
-        <td>
-          <span class="badge-block">${r.blok} No. ${r.noRumah}</span><br>
-          <span style="font-size: 11px; color: #64748b;">${r.alamat}</span>
-        </td>
-        <td>
-          <span class="badge-status ${r.statusHunian === 'Pemilik Tetap' ? 'badge-approved' : 'badge-pending'}">
-            ${r.statusHunian}
-          </span>
-        </td>
-        <td style="text-align: center;"><strong>${r.jumlahAnggota || (r.familyMembers ? r.familyMembers.length : 1)}</strong> Jiwa</td>
-        <td>
-          <a href="${waLink}" target="_blank" class="btn-icon-action btn-icon-wa" title="Kirim Pesan WhatsApp">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
-            <span style="margin-left: 6px; font-size: 12px; font-weight: 600;">${r.phone}</span>
-          </a>
-        </td>
-        <td class="pengurus-only">
-          <div class="pwd-cell-box">
-            <span class="pwd-text-display" id="pwdDisplay_${r.id}" data-real-pwd="${(r.password || '123456').replace(/"/g, '&quot;')}">••••••</span>
-            <button type="button" class="btn-icon-action" style="padding: 2px 4px; width: 24px; height: 24px;" title="Lihat / Sembunyikan Password" onclick="App.toggleTablePassword('${r.id}')">
-              <span id="pwdEye_${r.id}" style="font-size: 12px;">👁️</span>
-            </button>
-            <button type="button" class="btn-icon-action" style="padding: 2px 4px; width: 24px; height: 24px; color: #0d9488;" title="Ubah / Reset Password Warga Ini" onclick="App.resetResidentPassword('${r.id}')">
-              <span style="font-size: 12px;">🔑</span>
-            </button>
-          </div>
-        </td>
-        <td class="pengurus-only">
-          <div class="table-actions">
-            <button class="btn-icon-action" title="Lihat Anggota Keluarga & Dokumen KK/KTP" onclick="App.openAdminResidentDetail('${r.id}')" style="color: #0f766e;">
-              <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            </button>
-            <button class="btn-icon-action" title="Edit Data Warga" onclick="App.editResident('${r.id}')">
-              <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            </button>
-            <button class="btn-icon-action" style="color: #ef4444;" title="Hapus Data Warga" onclick="App.deleteResident('${r.id}')">
-              <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-            </button>
-          </div>
-        </td>
+    if (pageItems.length === 0) {
+      tableBody.innerHTML = `
+        <tr>
+          <td colspan="8" style="text-align: center; padding: 32px 16px; color: #94a3b8;">
+            <div style="font-size: 26px; margin-bottom: 6px;">🔍</div>
+            <div style="font-weight: 600; color: #475569;">Tidak ada data warga ditemukan.</div>
+            <div style="font-size: 12px; margin-top: 4px;">Coba ubah kata kunci pencarian atau filter blok.</div>
+          </td>
+        </tr>
       `;
+    } else {
+      pageItems.forEach((r, idx) => {
+        const rowNumber = startIndex + idx + 1;
+        const tr = document.createElement('tr');
+        const waLink = `https://wa.me/${r.phone}?text=${encodeURIComponent(`Halo Bpk/Ibu ${r.nama} (Warga ${r.alamat}), salam dari Pengurus ${this.data.settings.rtName}.`)}`;
 
-      tableBody.appendChild(tr);
-    });
+        tr.innerHTML = `
+          <td style="text-align: center; color: var(--text-muted);">${rowNumber}</td>
+          <td>
+            <div class="table-resident-name">
+              <div class="avatar-img" style="width: 32px; height: 32px; font-size: 11px;">
+                ${r.nama.split(' ').map(n=>n[0]).join('').slice(0, 2)}
+              </div>
+              <div>
+                <strong>${r.nama}</strong><br>
+                <span style="font-size: 11px; color: #64748b;">NIK: ${r.nik || '-'}</span>
+              </div>
+            </div>
+          </td>
+          <td>
+            <span class="badge-block">${r.blok} No. ${r.noRumah}</span><br>
+            <span style="font-size: 11px; color: #64748b;">${r.alamat}</span>
+          </td>
+          <td>
+            <span class="badge-status ${r.statusHunian === 'Pemilik Tetap' ? 'badge-approved' : 'badge-pending'}">
+              ${r.statusHunian}
+            </span>
+          </td>
+          <td style="text-align: center;"><strong>${r.jumlahAnggota || (r.familyMembers ? r.familyMembers.length : 1)}</strong> Jiwa</td>
+          <td>
+            <a href="${waLink}" target="_blank" class="btn-icon-action btn-icon-wa" title="Kirim Pesan WhatsApp">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+              <span style="margin-left: 6px; font-size: 12px; font-weight: 600;">${r.phone}</span>
+            </a>
+          </td>
+          <td class="pengurus-only">
+            <div class="pwd-cell-box">
+              <span class="pwd-text-display" id="pwdDisplay_${r.id}" data-real-pwd="${(r.password || '123456').replace(/"/g, '&quot;')}">••••••</span>
+              <button type="button" class="btn-icon-action" style="padding: 2px 4px; width: 24px; height: 24px;" title="Lihat / Sembunyikan Password" onclick="App.toggleTablePassword('${r.id}')">
+                <span id="pwdEye_${r.id}" style="font-size: 12px;">👁️</span>
+              </button>
+              <button type="button" class="btn-icon-action" style="padding: 2px 4px; width: 24px; height: 24px; color: #0d9488;" title="Ubah / Reset Password Warga Ini" onclick="App.resetResidentPassword('${r.id}')">
+                <span style="font-size: 12px;">🔑</span>
+              </button>
+            </div>
+          </td>
+          <td class="pengurus-only">
+            <div class="table-actions">
+              <button class="btn-icon-action" title="Lihat Anggota Keluarga & Dokumen KK/KTP" onclick="App.openAdminResidentDetail('${r.id}')" style="color: #0f766e;">
+                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              </button>
+              <button class="btn-icon-action" title="Edit Data Warga" onclick="App.editResident('${r.id}')">
+                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              </button>
+              <button class="btn-icon-action" style="color: #ef4444;" title="Hapus Data Warga" onclick="App.deleteResident('${r.id}')">
+                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              </button>
+            </div>
+          </td>
+        `;
 
+        tableBody.appendChild(tr);
+      });
+    }
+
+    this.renderWargaPagination(totalItems, totalPages, startIndex, endIndex);
     this.renderRoleUI();
+  },
+
+  renderWargaPagination(totalItems, totalPages, startIndex, endIndex) {
+    const container = document.getElementById('wargaPagination');
+    if (!container) return;
+
+    if (totalItems === 0) {
+      container.style.display = 'none';
+      return;
+    }
+    container.style.display = 'flex';
+
+    const infoEl = document.getElementById('wargaPaginationInfo');
+    if (infoEl) {
+      infoEl.innerHTML = `Menampilkan <strong>${startIndex + 1} - ${endIndex}</strong> dari <strong>${totalItems}</strong> warga`;
+    }
+
+    const controlsEl = document.getElementById('wargaPaginationControls');
+    if (!controlsEl) return;
+
+    const curPage = AppState.wargaPage || 1;
+    let html = '';
+
+    // Tombol Previous
+    html += `
+      <button type="button" class="pagination-btn" ${curPage <= 1 ? 'disabled' : ''} onclick="App.changeWargaPage(${curPage - 1})" title="Halaman Sebelumnya">
+        &laquo; Prev
+      </button>
+    `;
+
+    // Tombol Nomor Halaman (1, 2, 3...)
+    const maxButtons = 5;
+    let startP = Math.max(1, curPage - Math.floor(maxButtons / 2));
+    let endP = Math.min(totalPages, startP + maxButtons - 1);
+    if (endP - startP + 1 < maxButtons) {
+      startP = Math.max(1, endP - maxButtons + 1);
+    }
+
+    if (startP > 1) {
+      html += `<button type="button" class="pagination-btn" onclick="App.changeWargaPage(1)">1</button>`;
+      if (startP > 2) html += `<span style="padding: 0 4px; color: #94a3b8;">...</span>`;
+    }
+
+    for (let p = startP; p <= endP; p++) {
+      html += `
+        <button type="button" class="pagination-btn ${p === curPage ? 'active' : ''}" onclick="App.changeWargaPage(${p})">
+          ${p}
+        </button>
+      `;
+    }
+
+    if (endP < totalPages) {
+      if (endP < totalPages - 1) html += `<span style="padding: 0 4px; color: #94a3b8;">...</span>`;
+      html += `<button type="button" class="pagination-btn" onclick="App.changeWargaPage(${totalPages})">${totalPages}</button>`;
+    }
+
+    // Tombol Next
+    html += `
+      <button type="button" class="pagination-btn" ${curPage >= totalPages ? 'disabled' : ''} onclick="App.changeWargaPage(${curPage + 1})" title="Halaman Selanjutnya">
+        Next &raquo;
+      </button>
+    `;
+
+    // Dropdown Ukuran Halaman
+    html += `
+      <div style="display: flex; align-items: center; gap: 6px; margin-left: 8px;">
+        <span style="font-size: 12px; color: #64748b;">Per hal:</span>
+        <select class="form-control" style="width: auto; padding: 4px 8px; font-size: 12px; height: 34px; border-radius: 8px;" onchange="App.changeWargaPageSize(this.value)">
+          <option value="10" ${AppState.wargaPageSize === 10 ? 'selected' : ''}>10</option>
+          <option value="25" ${AppState.wargaPageSize === 25 ? 'selected' : ''}>25</option>
+          <option value="50" ${AppState.wargaPageSize === 50 ? 'selected' : ''}>50</option>
+        </select>
+      </div>
+    `;
+
+    controlsEl.innerHTML = html;
+  },
+
+  changeWargaPage(page) {
+    AppState.wargaPage = page;
+    this.renderResidents(page);
+    const tableEl = document.querySelector('#view-warga .data-table-container');
+    if (tableEl) {
+      tableEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  },
+
+  changeWargaPageSize(size) {
+    AppState.wargaPageSize = parseInt(size, 10) || 10;
+    AppState.wargaPage = 1;
+    this.renderResidents(1);
   },
 
   openAddResidentModal() {
@@ -4642,7 +4766,8 @@ const App = {
   // =========================================================================
   handleSearch() {
     if (AppState.activeTab === 'warga') {
-      this.renderResidents();
+      AppState.wargaPage = 1;
+      this.renderResidents(1);
     } else if (AppState.activeTab === 'kas') {
       this.renderTransactions();
     } else {
