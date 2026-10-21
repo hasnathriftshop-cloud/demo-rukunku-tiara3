@@ -1818,21 +1818,11 @@ const App = {
             </div>
             <div>
               ${duesStatus !== 'Lunas' ? `
-                <button class="btn-teal-pill" onclick="App.openModal('modalKonfirmasiWarga')">
+                <button class="btn-teal-pill" onclick="App.openWargaBayarModal(${curYear}, ${curMonth})">
                   💳 Konfirmasi / Bayar Iuran
                 </button>
               ` : `
-                <button class="btn-outline-pill" style="border-color: #10b981; color: #047857;" onclick="
-                  ReportGenerator.openKwitansi({
-                    kwitansi: 'KW-IURAN-${resident.id}-${curYear}-${curMonth}',
-                    judul: 'Iuran ${curMonthName} ${curYear} - ${resident.nama}',
-                    blok: '${resident.alamat}',
-                    tanggal: '${curYear}-${String(curMonth).padStart(2, '0')}-10',
-                    kategori: 'Iuran Bulanan',
-                    nominal: ${this.data.settings.iuranWajibBulanan},
-                    metode: 'Transfer / QRIS RT'
-                  })
-                ">
+                <button class="btn-outline-pill" style="border-color: #10b981; color: #047857;" onclick="App.printDuesReceipt('${resident ? resident.id : ''}', ${curYear}, ${curMonth})">
                   ✅ Lunas • Cetak Bukti Kwitansi
                 </button>
               `}
@@ -3127,7 +3117,7 @@ const App = {
       periodeTahun: curYear,
       blok: res.alamat,
       nominal: monthlyFee,
-      metode: AppState.currentRole === 'petugas' ? 'Kas Tunai (Petugas Blok)' : 'Kas Tunai / Transfer',
+      metode: AppState.currentRole === 'petugas' ? 'Kas Tunai (Petugas Blok)' : 'Kas Tunai (Bendahara RT)',
       status: 'Approved',
       kwitansi: kwitansiNo,
       pencatat: collectorLabel,
@@ -5051,21 +5041,13 @@ const App = {
           <td><span class="badge-status ${badgeCls}">${st}</span></td>
           <td style="text-align: right;">
             ${st === 'Lunas' ? `
-              <button class="btn-outline-pill" style="padding: 4px 10px; font-size: 11px;" onclick="
-                ReportGenerator.openKwitansi({
-                  kwitansi: 'KW-IURAN-${resident.id}-${m}-${curWargaYear}',
-                  judul: 'Iuran ${monthNames[m-1]} ${curWargaYear} - ${resident.nama}',
-                  blok: '${resident.alamat}',
-                  tanggal: '${curWargaYear}-${String(m).padStart(2, '0')}-05',
-                  kategori: 'Iuran Bulanan',
-                  nominal: ${this.data.settings.iuranWajibBulanan},
-                  metode: 'Transfer / QRIS RT'
-                })
-              ">📄 Cetak Kwitansi</button>
+              <button class="btn-outline-pill" style="padding: 4px 10px; font-size: 11px;" onclick="App.printDuesReceipt('${resident.id}', ${curWargaYear}, ${m})">
+                📄 Cetak Kwitansi
+              </button>
             ` : (st === 'Pending' ? `
-              <span style="font-size: 11px; color: #b45309;">Menunggu Verifikasi Bendahara</span>
+              <span style="font-size: 11px; color: #b45309; font-weight: 600;">⏳ Menunggu Verifikasi Bendahara</span>
             ` : `
-              <button class="btn-teal-pill" style="padding: 4px 10px; font-size: 11px;" onclick="App.openModal('modalKonfirmasiWarga')">
+              <button class="btn-teal-pill" style="padding: 4px 10px; font-size: 11px;" onclick="App.openWargaBayarModal(${curWargaYear}, ${m})">
                 💳 Bayar Sekarang
               </button>
             `)}
@@ -5098,6 +5080,140 @@ const App = {
         });
       }
     }
+  },
+
+  // =========================================================================
+  // Kwitansi Iuran Riil & Pembayaran Mandiri Warga
+  // =========================================================================
+  printDuesReceipt(residentId, year, month) {
+    const yNum = Number(year || AppState.selectedYear || new Date().getFullYear());
+    const mNum = Number(month || AppState.selectedMonth || (new Date().getMonth() + 1));
+    const resident = (this.data.residents || []).find(r => r.id === residentId) ||
+                     (AppState.currentUser ? (this.data.residents || []).find(r => r.id === AppState.currentUser.residentId) : null);
+    const targetResId = resident ? resident.id : residentId;
+
+    // 1. Cari transaksi riil kas masuk di database yang cocok dengan warga & periode bulan/tahun
+    let tx = (this.data.transactions || []).find(t => {
+      const matchRes = t.residentId === targetResId;
+      const matchMonth = Number(t.periodeBulan) === mNum;
+      const matchYear = t.periodeTahun ? Number(t.periodeTahun) === yNum : true;
+      const matchApproved = t.status !== 'Batal';
+      return matchRes && matchMonth && matchYear && matchApproved;
+    });
+
+    // 2. Pencarian alternatif jika transaksi disimpan dengan nama bulan di judul/keterangan
+    if (!tx) {
+      const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+      const mName = monthNames[mNum - 1] || '';
+      tx = (this.data.transactions || []).find(t => {
+        const matchRes = t.residentId === targetResId;
+        const text = `${t.judul || ''} ${t.keterangan || ''}`.toLowerCase();
+        return matchRes && mName && text.includes(mName.toLowerCase()) && t.status !== 'Batal';
+      });
+    }
+
+    if (tx) {
+      ReportGenerator.openKwitansi(tx);
+    } else {
+      // 3. Fallback akurat jika data transaksi lama belum memiliki record di transactions
+      const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+      const mName = monthNames[mNum - 1] || 'Bulan';
+      const monthlyFee = (this.data.settings && this.data.settings.iuranWajibBulanan) || 50000;
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const nowTimeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+
+      const fallbackTx = {
+        kwitansi: `KW-IURAN-${targetResId}-${yNum}-${mNum}-${Date.now().toString().slice(-4)}`,
+        judul: `Iuran Bulanan - Bpk. ${resident ? resident.nama : 'Warga'}`,
+        blok: resident ? `${resident.blok} No. ${resident.noRumah}` : '',
+        tanggal: todayStr,
+        waktu: nowTimeStr,
+        kategori: 'Iuran Bulanan',
+        keterangan: `Iuran ${mName} ${yNum} (${resident ? resident.alamat : ''})`,
+        nominal: monthlyFee,
+        metode: 'Kas Tunai (Petugas Blok)', // Default sesuai alur klik lunas oleh petugas blok di lapangan
+        status: 'Approved'
+      };
+      ReportGenerator.openKwitansi(fallbackTx);
+    }
+  },
+
+  openWargaBayarModal(year, month) {
+    const curYear = year || AppState.wargaSelectedYear || AppState.selectedYear || new Date().getFullYear();
+    const curMonth = month || AppState.selectedMonth || (new Date().getMonth() + 1);
+    const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+
+    const infoBulanEl = document.getElementById('wargaKonfirmasiPeriodeInfo');
+    if (infoBulanEl) {
+      infoBulanEl.textContent = `${monthNames[curMonth - 1]} ${curYear}`;
+    }
+
+    const inputYear = document.getElementById('wargaKonfirmasiTahun');
+    const inputMonth = document.getElementById('wargaKonfirmasiBulan');
+    if (inputYear) inputYear.value = curYear;
+    if (inputMonth) inputMonth.value = curMonth;
+
+    this.openModal('modalKonfirmasiWarga');
+  },
+
+  submitKonfirmasiWarga() {
+    const resident = (this.data.residents || []).find(r => r.id === AppState.currentResidentId) || this.data.residents[0];
+    if (!resident) {
+      alert("Akun warga tidak ditemukan.");
+      return;
+    }
+
+    const curYear = parseInt(document.getElementById('wargaKonfirmasiTahun')?.value, 10) || AppState.wargaSelectedYear || new Date().getFullYear();
+    const curMonth = parseInt(document.getElementById('wargaKonfirmasiBulan')?.value, 10) || (new Date().getMonth() + 1);
+    const metode = document.getElementById('wargaKonfirmasiMetode')?.value || 'Transfer Bank BCA';
+    const note = (document.getElementById('wargaKonfirmasiNote')?.value || '').trim();
+    const monthlyFee = (this.data.settings && this.data.settings.iuranWajibBulanan) || 50000;
+    const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+    const mName = monthNames[curMonth - 1] || 'Bulan';
+
+    // 1. Ubah status iuran warga menjadi Pending
+    this.setDuesStatus(resident.id, curYear, curMonth, 'Pending');
+
+    // 2. Buat transaksi kas berstatus Pending dengan metode pembayaran mandiri (Transfer / QRIS)
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const nowTimeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+    const kwitansiNo = `KW-IURAN-${resident.id}-${curYear}-${curMonth}-${Date.now().toString().slice(-4)}`;
+
+    const newTx = {
+      id: `TX-IURAN-${curYear}-${String(curMonth).padStart(2, '0')}-${Date.now().toString().slice(-4)}`,
+      tanggal: todayStr,
+      waktu: nowTimeStr,
+      tipe: 'masuk',
+      kategori: 'Iuran Bulanan',
+      judul: `Iuran Bulanan - Bpk. ${resident.nama}`,
+      keterangan: `Iuran ${mName} ${curYear} (${resident.alamat})${note ? ` • ${note}` : ''}`,
+      residentId: resident.id,
+      periodeBulan: curMonth,
+      periodeTahun: curYear,
+      blok: resident.alamat,
+      nominal: monthlyFee,
+      metode: metode, // Sesuai metode yang dipilih warga: 'Transfer Bank BCA' atau 'QRIS RT'
+      status: 'Pending',
+      kwitansi: kwitansiNo,
+      pencatat: `Warga Mandiri (${resident.nama})`,
+      collectorId: 'mandiri',
+      statusSetoran: 'disetor_ke_bendahara'
+    };
+
+    if (!Array.isArray(this.data.transactions)) this.data.transactions = [];
+    this.data.transactions.unshift(newTx);
+    DB.save(this.data);
+
+    if (window.CloudSync && typeof window.CloudSync.syncNow === 'function') {
+      window.CloudSync.syncNow();
+    }
+
+    this.closeModal('modalKonfirmasiWarga');
+    this.renderDashboard();
+    this.renderWargaIuranHistory();
+    this.updateNotificationBadge();
+
+    alert(`✅ Konfirmasi pembayaran iuran ${mName} ${curYear} berhasil dikirim!\n\nMetode: ${metode}\nStatus: Menunggu Verifikasi Bendahara RT.`);
   },
 
   // =========================================================================
