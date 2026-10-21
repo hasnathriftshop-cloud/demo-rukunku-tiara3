@@ -1,0 +1,1902 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RukunKu - Manajemen Warga & Keuangan Lingkungan RT Terpadu</title>
+  
+  <!-- Inter Google Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Custom Modern Stylesheet -->
+  <link rel="stylesheet" href="css/style.css?v=20261021_02">
+</head>
+<body>
+
+  <!-- ========================================================================
+       HALAMAN UTAMA: LOGIN & DAFTAR AKUN WARGA (Fixing Point 1 & 2)
+       Tampil pertama kali saat membuka webapp RukunKu
+       ======================================================================== -->
+  <div id="screenAuth" class="auth-screen-container">
+    <div class="auth-screen-card">
+      
+      <!-- Brand Header -->
+      <div class="auth-brand-header">
+        <div class="auth-brand-logo-icon">
+          <svg width="28" height="28" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.3" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+          </svg>
+        </div>
+        <h1 class="auth-brand-title">RukunKu</h1>
+        <div class="auth-brand-desc">Sistem Manajemen Warga & Keuangan Lingkungan RT Terpadu</div>
+        <div class="auth-rt-pill">
+          <span class="display-rt-name">RT 05 / RW 02</span> <span class="display-perumahan">Perum Tiara Candi 3</span>
+        </div>
+      </div>
+
+      <!-- Tab Navigasi: Masuk vs Daftar Warga -->
+      <div class="auth-tabs">
+        <button type="button" class="auth-tab-btn active" data-auth-tab="login" onclick="App.switchAuthTab('login')">
+          Masuk (Login)
+        </button>
+        <button type="button" class="auth-tab-btn" data-auth-tab="register" onclick="App.switchAuthTab('register')">
+          Daftar Akun Warga
+        </button>
+      </div>
+
+      <!-- 1. TAB LOGIN -->
+      <div id="authLoginSection">
+        <p style="font-size: 12.5px; color: #64748b; margin-bottom: 14px;">
+          Pilih peran akun Anda untuk masuk ke sistem lingkungan:
+        </p>
+
+        <!-- Pilihan Role Akun (Pengurus dan Warga) -->
+        <div class="auth-role-grid" style="grid-template-columns: 1fr 1fr;">
+          <div class="auth-role-card selected" data-role="pengurus" onclick="App.selectAuthRole('pengurus')">
+            <span class="auth-role-icon">🛡️</span>
+            <span class="auth-role-title">Pengurus</span>
+            <span class="auth-role-desc">Ketua RT, Bendahara Umum, atau Petugas</span>
+          </div>
+          <div class="auth-role-card" data-role="warga" onclick="App.selectAuthRole('warga')">
+            <span class="auth-role-icon">👨‍👩‍👧‍👦</span>
+            <span class="auth-role-title">Warga</span>
+            <span class="auth-role-desc">Akses transparansi & iuran keluarga</span>
+          </div>
+        </div>
+
+        <form onsubmit="App.loginSubmit(event)">
+          <div class="form-group">
+            <label class="form-label" id="authUsernameLabel">Username Pengurus *</label>
+            <input type="text" id="authUsername" class="form-control" placeholder="User" value="" required autocomplete="username">
+            <span id="authUsernameHint" style="display: none;"></span>
+          </div>
+
+          <div class="form-group" style="margin-top: 10px;">
+            <label class="form-label" id="authPasswordLabel">Password Akun *</label>
+            <div style="position: relative; display: flex; align-items: center;">
+              <input type="password" id="authPassword" class="form-control" placeholder="Password" value="" required style="padding-right: 42px;" autocomplete="current-password">
+              <button type="button" class="btn-eye-toggle" onclick="App.toggleInputPassword('authPassword', this)" title="Lihat/Sembunyikan Password">👁️</button>
+            </div>
+          </div>
+
+          <div style="margin-top: 20px;">
+            <button type="submit" class="btn-teal-pill" style="width: 100%; justify-content: center; padding: 13px; font-size: 14px;">
+              Masuk ke Sistem
+            </button>
+          </div>
+
+          <!-- Bantuan Akun Cepat & Petunjuk Login -->
+          <div style="margin-top: 16px; padding: 12px 14px; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 12px; font-size: 12px; color: #475569; line-height: 1.5;">
+            <div style="font-weight: 700; color: #0f766e; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+              <span>💡</span>
+              <span>Petunjuk Akses Akun:</span>
+            </div>
+            <div>• <strong>Pengurus:</strong> Username: <code>admin</code> • Password: <code>123</code></div>
+            <div style="margin-top: 2px;">• <strong>Warga:</strong> Gunakan <strong>NIK</strong> atau <strong>No. WhatsApp</strong> terdaftar.</div>
+            <div style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap;">
+              <button type="button" class="btn-outline-pill" style="font-size: 11px; padding: 5px 12px; cursor: pointer;" onclick="App.fillDemoLogin('pengurus')">
+                🔑 Isi Akun Pengurus
+              </button>
+              <button type="button" class="btn-outline-pill" style="font-size: 11px; padding: 5px 12px; cursor: pointer;" onclick="App.fillDemoLogin('warga')">
+                👨‍👩‍👧‍👦 Isi Akun Warga
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <!-- 2. TAB DAFTAR AKUN WARGA BARU (Simplified) -->
+      <div id="authRegisterSection" style="display: none;">
+        <div style="background: #f0fdfa; border: 1px solid #ccfbf1; border-radius: 12px; padding: 12px; margin-bottom: 14px; font-size: 12px; color: #0f766e; line-height: 1.5;">
+          <strong>💡 Pendaftaran Cepat & Simpel:</strong> Cukup daftarkan identitas kepala keluarga di bawah. Anggota keluarga yang tinggal bersama serta dokumen KK & KTP dapat ditambahkan langsung setelah masuk ke dashboard warga.
+        </div>
+
+        <form onsubmit="App.registerWargaSubmit(event)">
+          <div class="form-group">
+            <label class="form-label">Nama Lengkap Kepala Keluarga (KK) *</label>
+            <input type="text" id="regNama" class="form-control" placeholder="Contoh: Bpk. Hendra Pratama" required>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Nomor WhatsApp Aktif *</label>
+              <input type="text" id="regPhone" class="form-control" placeholder="Contoh: 081234567890" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Status Hunian</label>
+              <select id="regStatusHunian" class="form-control">
+                <option value="Pemilik Tetap">Pemilik Tetap</option>
+                <option value="Kontrak">Kontrak / Sewa</option>
+                <option value="Kos">Kos</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Pilihan Blok Rumah *</label>
+              <select id="regWargaBlok" class="form-control" required>
+                <!-- Dynamically populated -->
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Nomor Rumah *</label>
+              <input type="text" id="regNoRumah" class="form-control" placeholder="Contoh: 12A" required>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Nomor Induk Kependudukan (NIK) KK *</label>
+              <input type="text" id="regNik" class="form-control" placeholder="16 digit NIK Kepala Keluarga" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Nomor Kartu Keluarga (No KK)</label>
+              <input type="text" id="regNoKk" class="form-control" placeholder="16 digit No KK (opsional)">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Buat Password Akun *</label>
+              <div style="position: relative; display: flex; align-items: center;">
+                <input type="password" id="regPassword" class="form-control" placeholder="Minimal 6 karakter" required style="padding-right: 42px;">
+                <button type="button" class="btn-eye-toggle" onclick="App.toggleInputPassword('regPassword', this)" title="Lihat/Sembunyikan Password">👁️</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Ulangi Password *</label>
+              <div style="position: relative; display: flex; align-items: center;">
+                <input type="password" id="regPasswordConfirm" class="form-control" placeholder="Ulangi password" required style="padding-right: 42px;">
+                <button type="button" class="btn-eye-toggle" onclick="App.toggleInputPassword('regPasswordConfirm', this)" title="Lihat/Sembunyikan Password">👁️</button>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top: 18px;">
+            <button type="submit" class="btn-teal-pill" style="width: 100%; justify-content: center; padding: 13px; font-size: 14px;">
+              Daftar & Masuk ke Dashboard Warga
+            </button>
+          </div>
+        </form>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Main Rounded Application Frame matching mockup (Hidden initially until user logs in) -->
+  <div class="app-container" id="appMainLayout" style="display: none;">
+
+    <!-- ======================================================================
+         SIDEBAR NAVIGATION (Teal Left Panel with Iconic Inverted Active Curve)
+         ====================================================================== -->
+    <aside class="sidebar">
+      
+      <!-- Brand Logo Header -->
+      <div class="brand" data-tab="dashboard" onclick="App.switchTab('dashboard')">
+        <div class="brand-icon">
+          <!-- House / Community Emblem -->
+          <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.3" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+          </svg>
+        </div>
+        <div class="brand-info">
+          <span class="brand-title">RukunKu</span>
+          <span class="brand-subtitle" id="brandSubtitle">Memuat RT & Lingkungan...</span>
+        </div>
+      </div>
+
+      <!-- Navigation Menu with Curved Tab Active Cutouts -->
+      <ul class="nav-menu">
+        <!-- Dashboard (Shared) -->
+        <li class="nav-item">
+          <a class="nav-link active" data-tab="dashboard">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            <span class="pengurus-only">Dashboard Admin</span>
+            <span class="petugas-only" style="display: none;">Dashboard Petugas</span>
+            <span class="warga-only">Dashboard Warga</span>
+          </a>
+        </li>
+
+        <!-- Data Warga (Pengurus & Petugas Blok) -->
+        <li class="nav-item pengurus-petugas-only">
+          <a class="nav-link" data-tab="warga">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <span class="pengurus-only">Data Warga</span>
+            <span class="petugas-only" style="display: none;">Data Warga Blok</span>
+          </a>
+        </li>
+
+        <!-- Iuran Bulanan (Pengurus & Petugas Blok) -->
+        <li class="nav-item pengurus-petugas-only">
+          <a class="nav-link" data-tab="iuran">
+            <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <span class="pengurus-only">Iuran Bulanan</span>
+            <span class="petugas-only" style="display: none;">Tagih Iuran Blok</span>
+          </a>
+        </li>
+
+        <!-- Rekap & Setoran Blok (Pengurus & Petugas Blok) -->
+        <li class="nav-item pengurus-petugas-only">
+          <a class="nav-link" data-tab="setoran-blok">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 9V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M15 13v4"/><path d="M13 15h4"/></svg>
+            <span class="pengurus-only">Rekap & Setoran Blok</span>
+            <span class="petugas-only" style="display: none;">Setor Kas ke Bendahara</span>
+            <span class="badge-notif" id="badgePendingSetoran" style="display: none; background: #e11d48; color: #fff; font-size: 10px; padding: 2px 7px; border-radius: 10px; margin-left: auto; font-weight: 700;">0</span>
+          </a>
+        </li>
+
+        <!-- Menu Khusus Petugas Penagih Blok (Pengurus Only) -->
+        <li class="nav-item pengurus-only">
+          <a class="nav-link" data-tab="kelola-petugas">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <span>Petugas Penagih Blok</span>
+          </a>
+        </li>
+
+        <!-- Buku Kas RT (Pengurus Utama Only) -->
+        <li class="nav-item pengurus-only">
+          <a class="nav-link" data-tab="kas">
+            <svg viewBox="0 0 24 24" fill="none"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            <span>Buku Kas RT</span>
+          </a>
+        </li>
+        <li class="nav-item pengurus-only">
+          <a class="nav-link" data-tab="talangan">
+            <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><line x1="12" y1="6" x2="12" y2="8"/><line x1="12" y1="16" x2="12" y2="18"/></svg>
+            <span>Talangan & Utang</span>
+          </a>
+        </li>
+        <li class="nav-item pengurus-only">
+          <a class="nav-link" data-tab="laporan">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            <span>Laporan PDF</span>
+          </a>
+        </li>
+
+        <!-- Warga Only Menus -->
+        <li class="nav-item warga-only">
+          <a class="nav-link" data-tab="warga-iuran">
+            <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <span>Iuran Rumah Saya</span>
+          </a>
+        </li>
+        <li class="nav-item warga-only">
+          <a class="nav-link" data-tab="kas">
+            <svg viewBox="0 0 24 24" fill="none"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            <span>Transparansi Kas RT</span>
+          </a>
+        </li>
+        <li class="nav-item warga-only">
+          <a class="nav-link" data-tab="warga-profil">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <span>Biodata Keluarga</span>
+          </a>
+        </li>
+      </ul>
+
+      <!-- Sidebar Promo / RT Siaga Card (Matching the stylized cat illustration card in mockup) -->
+      <div class="sidebar-footer">
+        <div class="sidebar-card">
+          <div class="sidebar-card-art">
+            <svg class="cat-silhouette" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C8 2 5 6 5 11c0 3 1.5 5 2.5 7L7 21h4l1-2 1 2h4l-.5-3c1-2 2.5-4 2.5-7 0-5-3-9-7-9zm-2.5 9a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/>
+            </svg>
+            <div class="art-badge">📢</div>
+          </div>
+          <div class="sidebar-card-title">Siaga & Ronda RT</div>
+          <div class="sidebar-card-desc">Jadwal ronda malam aktif & kontak darurat lingkungan.</div>
+          <button class="btn-sidebar-upgrade" onclick="alert('Pos Ronda Keamanan Siaga: Pak Slamet (081234567803) - Ketua RT (081234567801)')">
+            <span>Kontak Pos Ronda</span>
+          </button>
+        </div>
+
+        <!-- Role Switcher, Pengaturan, & Logout -->
+        <div class="sidebar-links">
+          <a class="sidebar-sublink pengurus-only" onclick="App.openPengaturanModal()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            <span>Pengaturan RT</span>
+          </a>
+          <a class="sidebar-sublink pengurus-only" onclick="App.openKelolaBlokModal()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            <span>Kelola Blok RT</span>
+          </a>
+          <a class="sidebar-sublink pengurus-only" onclick="App.openKelolaKategoriModal()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 6h16M4 12h16M4 18h7"/></svg>
+            <span>Kategori Transaksi</span>
+          </a>
+          <a class="sidebar-sublink pengurus-only" onclick="App.openKelolaPetugasModal()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <span>Petugas Penagih Blok</span>
+          </a>
+          <a class="sidebar-sublink pengurus-only" onclick="document.getElementById('inputGasUrl').value = CloudSync.getGasUrl(); App.openModal('modalCloudSync');">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+            <span>Google Sheets & Cloud</span>
+          </a>
+          <a class="sidebar-sublink" style="color: #fca5a5;" onclick="App.logout()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            <span>Keluar (Logout)</span>
+          </a>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ======================================================================
+         MAIN CONTENT WRAPPER (Crisp White Canvas with Rounded Inner Corners)
+         ====================================================================== -->
+    <main class="main-wrapper">
+      
+      <!-- Top Application Header Bar -->
+      <header class="top-header">
+        
+        <!-- Search Field -->
+        <div class="search-box">
+          <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input type="text" id="globalSearchInput" class="search-input" placeholder="Search...">
+        </div>
+
+        <!-- Right User Profile & Role Switcher -->
+        <div class="header-right">
+          <!-- Cloud Sync Pill -->
+          <div class="cloud-sync-pill" id="cloudSyncPill" onclick="document.getElementById('inputGasUrl').value = CloudSync.getGasUrl(); App.openModal('modalCloudSync');" title="Konfigurasi Database Google Sheets">
+            <span class="cloud-sync-dot" id="cloudSyncDot"></span>
+            <span id="cloudSyncText">Mode: Database Lokal</span>
+            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+          </div>
+
+          <!-- Role Indicator Pill -->
+          <div class="role-badge-pill" id="roleBadgePill" title="Status Akun Pengguna">
+            <span class="role-dot"></span>
+            <span id="rolePillText">Mode: Pengurus RT</span>
+          </div>
+
+          <!-- User Profile (Click to Logout) -->
+          <div class="user-profile" onclick="App.logout()" title="Klik untuk keluar (Logout)">
+            <div class="user-info">
+              <span class="user-name" id="userNameDisplay">Bpk. Bambang Sutrisno</span>
+              <span class="user-role-text" id="userRoleDisplay">Ketua / Pengurus <span class="display-rt-name">RT</span></span>
+            </div>
+            <div class="avatar-wrapper">
+              <div class="avatar-img" id="userAvatar">BS</div>
+            </div>
+          </div>
+
+          <!-- Notification Bell -->
+          <button class="header-action-btn" title="Notifikasi Tagihan & Transaksi" onclick="App.openWaReminderModal()">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+            </svg>
+            <span class="notif-badge" id="headerNotifBadge"></span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Scrollable Main Content -->
+      <div class="content-body">
+        
+        <!-- ==================================================================
+             VIEW 1: DASHBOARD (Matches the visual design in the uploaded image)
+             ================================================================== -->
+        <section id="view-dashboard" class="view-panel active-view">
+          
+          <!-- Top Row: Page Title + Teal Download Report Button -->
+          <div class="page-title-row">
+            <div>
+              <h1 class="page-title" id="dashboardMainTitle">Buku Kas & Transaksi</h1>
+              <p class="page-subtitle" id="dashboardMainSubtitle">Ringkasan arus kas keuangan dan status iuran lingkungan <span class="display-rt-name">RT</span> <span class="display-perumahan"></span></p>
+            </div>
+            <div style="display: flex; gap: 10px;">
+              <button class="btn-teal-pill pengurus-only" onclick="App.openModal('modalCatatKas')">
+                <svg viewBox="0 0 24 24" fill="none"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <span>Catat Transaksi</span>
+              </button>
+              <button class="btn-teal-pill btn-download-report">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span>Download report</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Warga Mode: Personal Dues Status Banner -->
+          <div id="wargaPersonalStatus"></div>
+
+          <!-- Chart & Analytics Area (Matching exact 14 bars and legend from mockup) -->
+          <div class="chart-section">
+            <div class="chart-controls-bar">
+              <div class="period-selector">
+                <span>Period:</span>
+                <button class="period-dropdown-btn">
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  <span>1 Oktober – 14 Oktober 2026</span>
+                  <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+                </button>
+              </div>
+
+              <!-- Legends matching mockup dots -->
+              <div class="chart-legends">
+                <div class="legend-item">
+                  <span class="legend-dot-yellow"></span>
+                  <span>Highlight / Terpilih</span>
+                </div>
+                <div class="legend-item">
+                  <span class="legend-dot-blue"></span>
+                  <span>Kas Masuk Harian</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Interactive Bar Chart matching screenshot -->
+            <div class="bar-chart-container">
+              <!-- Y-Axis scale -->
+              <div class="y-axis-labels">
+                <div>Rp 3.0M</div>
+                <div>Rp 2.0M</div>
+                <div>Rp 1.0M</div>
+                <div>Rp 0</div>
+              </div>
+
+              <!-- Bar Area with 14 bars -->
+              <div class="chart-bars-area" id="chartBarsArea">
+                <!-- Dynamically rendered by App.renderChart() -->
+              </div>
+            </div>
+
+            <!-- X-Axis Labels 1 to 14 -->
+            <div class="x-axis-labels" id="xAxisArea"></div>
+          </div>
+
+          <!-- Two-Column Bottom Dashboard Section (Matching Mockup layout) -->
+          <div class="bottom-dashboard-grid">
+            
+            <!-- Left Column: Recent Transactions List (like "Arriving today") -->
+            <div class="activity-card">
+              <div class="section-header-row">
+                <h2 class="section-heading">Transaksi & Iuran Terbaru</h2>
+                <a class="section-link" onclick="App.switchTab('kas')">
+                  <span>Lihat semua</span>
+                  <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+                </a>
+              </div>
+
+              <!-- List of Recent Transactions matching mockup rows -->
+              <div class="transaction-list" id="recentTransactionsList">
+                <!-- Rendered dynamically by App.renderDashboard() -->
+              </div>
+            </div>
+
+            <!-- Right Column: Stylized Promo / Dues Progress Card -->
+            <div class="promo-card-widget">
+              <!-- Background Art overlay -->
+              <div class="promo-card-art">
+                <svg width="100%" height="100%" preserveAspectRatio="none" viewBox="0 0 300 120" fill="none">
+                  <path d="M0 120L40 80C80 40 120 70 160 90C200 110 240 60 300 80L300 120Z" fill="#a7f3d0" fill-opacity="0.5"/>
+                  <path d="M0 120L60 90C120 60 180 110 240 70L300 95L300 120Z" fill="#fed7aa" fill-opacity="0.6"/>
+                </svg>
+              </div>
+
+              <div class="promo-content">
+                <h3 class="promo-title">Capaian Iuran Bulan Ini</h3>
+                <p class="promo-desc" id="promoCardDesc">
+                  Pantau penerimaan iuran warga <span class="display-rt-name">RT</span> secara transparan & real-time.
+                </p>
+
+                <div class="promo-progress-box">
+                  <div class="progress-labels">
+                    <span>Target Terkumpul</span>
+                    <span id="duesProgressText">88% (44/50 KK)</span>
+                  </div>
+                  <div class="progress-track">
+                    <div class="progress-fill" id="duesProgressFill" style="width: 88%;"></div>
+                  </div>
+                </div>
+
+                <button class="btn-promo-action" onclick="App.openWaReminderModal()">
+                  <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                  <span>Kirim Pengingat WA</span>
+                </button>
+              </div>
+            </div>
+
+          </div>
+
+        </section>
+
+        <!-- ==================================================================
+             VIEW 2: DATA WARGA (Administrasi KK)
+             ================================================================== -->
+        <section id="view-warga" class="view-panel">
+          <div class="page-title-row">
+            <div>
+              <h1 class="page-title">Data Administrasi Warga</h1>
+              <p class="page-subtitle" id="totalWargaCount">Kepala Keluarga Terdaftar</p>
+            </div>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+              <button type="button" class="btn-outline-pill" onclick="CloudSync.pullFromSheets()" title="Tarik pembaruan data warga terbaru dari Google Sheets">
+                <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                <span>Segarkan Data</span>
+              </button>
+              <button class="btn-outline-pill pengurus-only" onclick="App.openKelolaBlokModal()">
+                <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                <span>Kelola Blok RT</span>
+              </button>
+              <button class="btn-outline-pill pengurus-only" onclick="App.switchTab('kelola-petugas')">
+                <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                <span>Petugas Penagih</span>
+              </button>
+              <button class="btn-teal-pill pengurus-only" onclick="App.openAddResidentModal()">
+                <svg viewBox="0 0 24 24" fill="none"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <span>Tambah Warga</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Filter Bar -->
+          <div class="action-filter-bar">
+            <div class="filter-group">
+              <select id="filterBlokSelect" class="select-filter" onchange="App.renderResidents()">
+                <option value="all">Semua Blok Lingkungan</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Table Container -->
+          <div class="data-table-container">
+            <table class="app-table">
+              <thead>
+                <tr>
+                  <th style="width: 35px; text-align: center;">No</th>
+                  <th>Kepala Keluarga / NIK</th>
+                  <th>Alamat / Blok Rumah</th>
+                  <th>Status Hunian</th>
+                  <th style="text-align: center;">Anggota</th>
+                  <th>Nomor WhatsApp</th>
+                  <th class="pengurus-only" style="min-width: 140px;">Akun & Password</th>
+                  <th class="pengurus-only" style="width: 110px;">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="residentsTableBody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             VIEW 3: BUKU KAS (Kas Masuk & Keluar)
+             ================================================================== -->
+        <section id="view-kas" class="view-panel">
+          <div class="page-title-row">
+            <div>
+              <h1 class="page-title">Pencatatan Kas Masuk & Keluar</h1>
+              <p class="page-subtitle">Transparansi pembukuan kas lingkungan <span class="display-rt-name">RT</span> <span class="display-perumahan"></span></p>
+            </div>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+              <button type="button" class="btn-outline-pill pengurus-only" onclick="App.openKelolaKategoriModal()">
+                <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h7"/></svg>
+                <span>🏷️ Kelola Kategori</span>
+              </button>
+              <button class="btn-teal-pill pengurus-only" onclick="App.openCatatKasModal()">
+                <svg viewBox="0 0 24 24" fill="none"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <span>+ Catat Kas Masuk/Keluar</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Metric Cards -->
+          <div class="metric-cards-grid">
+            <div class="metric-card">
+              <div class="metric-top">
+                <span class="metric-title">Total Kas Masuk</span>
+                <span class="metric-icon-box bg-pastel-teal">💰</span>
+              </div>
+              <div class="metric-value" id="metricTotalMasuk" style="color: #0d9488;">Rp 0</div>
+              <div class="metric-sub">Iuran & sumbangan</div>
+            </div>
+
+            <div class="metric-card">
+              <div class="metric-top">
+                <span class="metric-title">Total Pengeluaran</span>
+                <span class="metric-icon-box bg-pastel-rose">📉</span>
+              </div>
+              <div class="metric-value" id="metricTotalKeluar" style="color: #e11d48;">Rp 0</div>
+              <div class="metric-sub">Operasional & kebersihan</div>
+            </div>
+
+            <div class="metric-card">
+              <div class="metric-top">
+                <span class="metric-title">Sisa Saldo Kas RT</span>
+                <span class="metric-icon-box bg-pastel-yellow">🏦</span>
+              </div>
+              <div class="metric-value" id="metricSaldoKas" style="color: #148878;">Rp 0</div>
+              <div class="metric-sub">Kas aktif di bank & tunai</div>
+            </div>
+
+            <div class="metric-card">
+              <div class="metric-top">
+                <span class="metric-title">Rekening Resmi RT</span>
+                <span class="metric-icon-box bg-pastel-blue">💳</span>
+              </div>
+              <div class="metric-value display-rekening-rt" style="font-size: 14px; font-weight: 700;">BCA 8730192810</div>
+              <div class="metric-sub">a/n Kas <span class="display-rt-name">RT</span> <span class="display-perumahan"></span></div>
+            </div>
+          </div>
+
+          <!-- Filter Bar -->
+          <div class="action-filter-bar">
+            <div class="filter-group">
+              <select id="filterKasYear" class="select-filter" onchange="App.renderTransactions()" title="Filter Berdasarkan Periode Tahun">
+                <option value="all">Semua Tahun</option>
+                <option value="2025">Tahun 2025</option>
+                <option value="2026">Tahun 2026</option>
+                <option value="2027">Tahun 2027</option>
+                <option value="2028">Tahun 2028</option>
+              </select>
+
+              <select id="filterKasType" class="select-filter" onchange="App.renderTransactions()">
+                <option value="all">Semua Jenis Kas</option>
+                <option value="masuk">Hanya Kas Masuk</option>
+                <option value="keluar">Hanya Kas Keluar</option>
+              </select>
+
+              <select id="filterKasCategory" class="select-filter" onchange="App.renderTransactions()">
+                <option value="all">Semua Kategori Transaksi</option>
+                <option value="Iuran Bulanan">Iuran Bulanan</option>
+                <option value="Dana Kematian / Sosial">Dana Kematian / Sosial</option>
+                <option value="Honor Satpam & Keamanan">Honor Satpam & Keamanan</option>
+                <option value="Kebersihan & Truk Sampah">Kebersihan & Truk Sampah</option>
+                <option value="Perbaikan Fasilitas & Lampu Jalan">Perbaikan Fasilitas</option>
+                <option value="Konsumsi Kerja Bakti / Rapat">Konsumsi Kerja Bakti</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Table Container -->
+          <div class="data-table-container">
+            <table class="app-table">
+              <thead>
+                <tr>
+                  <th style="width: 35px; text-align: center;">No</th>
+                  <th>Tanggal</th>
+                  <th>Jenis</th>
+                  <th>Judul Transaksi / Rincian</th>
+                  <th>Kategori</th>
+                  <th style="text-align: right;">Nominal</th>
+                  <th>Metode</th>
+                  <th style="width: 70px;">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="transactionsTableBody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             VIEW 4: IURAN BULANAN (Matrix Penagihan)
+             ================================================================== -->
+        <section id="view-iuran" class="view-panel">
+          <div class="page-title-row">
+            <div>
+              <h1 class="page-title" id="duesMatrixTitle">Matriks Iuran Bulanan 2026</h1>
+              <p class="page-subtitle">Status pembayaran iuran wajib bulanan Rp 150.000 / KK</p>
+            </div>
+            <div style="display: flex; gap: 10px;">
+              <button class="btn-teal-pill pengurus-only" onclick="App.openWaReminderModal()">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                <span>Blast Pengingat WA</span>
+              </button>
+            </div>
+          </div>
+
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 12px 18px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+              <span><strong>Keterangan:</strong></span>
+              <span><span class="matrix-badge-lunas">✓</span> Lunas</span>
+              <span><span class="matrix-badge-lunas locked">✓ 🔒</span> Lunas Terkunci (Petugas)</span>
+              <span><span class="matrix-badge-pending">⏳</span> Menunggu Verifikasi</span>
+              <span><span class="matrix-badge-belum">✗</span> Belum Bayar</span>
+            </div>
+            <div class="pengurus-petugas-only" style="color: #64748b;">
+              🔒 <em>Status Lunas dikunci otomatis untuk Petugas demi keamanan kas. Koreksi keliru ceklist hanya via konfirmasi Admin RT.</em>
+            </div>
+          </div>
+
+          <!-- Filter & Pencarian Warga Matriks Iuran (Untuk Petugas & Pengurus) -->
+          <div class="action-filter-bar" style="margin-bottom: 18px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; background: #ffffff; padding: 12px 16px; border-radius: 14px; border: 1px solid #e2e8f0; box-shadow: 0 2px 6px rgba(0,0,0,0.02);">
+            <div style="position: relative; flex: 1; min-width: 250px; max-width: 480px;">
+              <svg style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 17px; height: 17px; color: #94a3b8; pointer-events: none;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input type="text" id="duesSearchInput" class="form-control" placeholder="Cari nama kepala keluarga, no. rumah, alamat..." oninput="App.onDuesSearch(this.value)" style="padding-left: 42px; padding-right: 36px; border-radius: 9999px; height: 40px; font-size: 13.5px; background: #f8fafc; border: 1px solid #cbd5e1;">
+              <button type="button" id="btnDuesSearchClear" onclick="App.clearDuesSearch()" style="display: none; position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; font-size: 18px; color: #94a3b8; cursor: pointer; padding: 0 4px;" title="Reset pencarian">&times;</button>
+            </div>
+            
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+              <!-- Pilihan Tahun Penagihan Aktif (Multi-Tahun Otomatis) -->
+              <select id="duesYearSelect" class="form-control" onchange="App.onDuesYearChange(this.value)" style="width: auto; border-radius: 9999px; height: 40px; font-size: 13px; padding: 0 14px; background: #f0fdfa; border: 1px solid #0d9488; font-weight: 800; color: #0f766e;" title="Pilih Tahun Iuran">
+                <option value="2025">Tahun 2025</option>
+                <option value="2026">Tahun 2026</option>
+                <option value="2027">Tahun 2027</option>
+                <option value="2028">Tahun 2028</option>
+                <option value="2029">Tahun 2029</option>
+                <option value="2030">Tahun 2030</option>
+              </select>
+
+              <!-- Pilihan Bulan Penagihan Aktif -->
+              <select id="duesMonthSelect" class="form-control" onchange="App.onDuesMonthChange(this.value)" style="width: auto; border-radius: 9999px; height: 40px; font-size: 13px; padding: 0 14px; background: #f8fafc; border: 1px solid #cbd5e1; font-weight: 700; color: #334155;">
+                <option value="1">Januari</option>
+                <option value="2">Februari</option>
+                <option value="3">Maret</option>
+                <option value="4">April</option>
+                <option value="5">Mei</option>
+                <option value="6">Juni</option>
+                <option value="7">Juli</option>
+                <option value="8">Agustus</option>
+                <option value="9">September</option>
+                <option value="10">Oktober</option>
+                <option value="11">November</option>
+                <option value="12">Desember</option>
+              </select>
+
+              <!-- Filter status bulan berjalan -->
+              <select id="duesStatusFilter" class="form-control" onchange="App.onDuesStatusFilter(this.value)" style="width: auto; border-radius: 9999px; height: 40px; font-size: 13px; padding: 0 14px; background: #f8fafc; border: 1px solid #cbd5e1;">
+                <option value="all">Semua Status Iuran</option>
+                <option value="lunas">Hanya Lunas</option>
+                <option value="belum">Hanya Belum Bayar</option>
+              </select>
+
+              <!-- Badge Scope & KK Count -->
+              <span class="badge-block" id="duesScopeCountBadge" style="font-size: 12px; padding: 7px 14px; background: #f0fdfa; color: #0d9488; border: 1px solid #99f6e4; font-weight: 700;">
+                Memuat warga...
+              </span>
+            </div>
+          </div>
+
+          <!-- Matrix Table -->
+          <div class="data-table-container matrix-container">
+            <table class="app-table">
+              <thead>
+                <tr>
+                  <th style="width: 30px; text-align: center;">No</th>
+                  <th>Kepala Keluarga / Blok</th>
+                  <th style="text-align: center;">Jan</th>
+                  <th style="text-align: center;">Feb</th>
+                  <th style="text-align: center;">Mar</th>
+                  <th style="text-align: center;">Apr</th>
+                  <th style="text-align: center;">Mei</th>
+                  <th style="text-align: center;">Jun</th>
+                  <th style="text-align: center;">Jul</th>
+                  <th style="text-align: center;">Ags</th>
+                  <th style="text-align: center;">Sep</th>
+                  <th style="text-align: center;" id="thDuesCurMonth">Okt</th>
+                  <th style="text-align: center;">Nov</th>
+                  <th style="text-align: center;">Des</th>
+                  <th class="pengurus-petugas-only" style="min-width: 140px; text-align: center;">Kwitansi / Tagihan WA</th>
+                </tr>
+              </thead>
+              <tbody id="duesMatrixBody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             VIEW 5: TALANGAN & UTANG WARGA
+             ================================================================== -->
+        <section id="view-talangan" class="view-panel">
+          <div class="page-title-row">
+            <div>
+              <h1 class="page-title">Catatan Talangan, Kasbon & Piutang</h1>
+              <p class="page-subtitle">Pencatatan kas RT untuk talangan darurat sementara dan kelonggaran iuran warga</p>
+            </div>
+            <div style="display: flex; gap: 10px;">
+              <button class="btn-teal-pill pengurus-only" onclick="App.openModal('modalCatatTalangan')">
+                <svg viewBox="0 0 24 24" fill="none"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <span>+ Catat Talangan Baru</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="data-table-container">
+            <table class="app-table">
+              <thead>
+                <tr>
+                  <th style="width: 35px; text-align: center;">No</th>
+                  <th>Nama Peminjam / Blok</th>
+                  <th>Keperluan / Alasan</th>
+                  <th>Tanggal & Tempo</th>
+                  <th style="text-align: right;">Total Pinjaman</th>
+                  <th style="text-align: right;">Terbayar</th>
+                  <th style="text-align: right;">Sisa Saldo</th>
+                  <th style="text-align: center;">Status</th>
+                  <th class="pengurus-only" style="width: 130px; text-align: center;">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="talanganTableBody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             VIEW 6: LAPORAN KEUANGAN & DOWNLOAD PDF
+             ================================================================== -->
+        <section id="view-laporan" class="view-panel">
+          <div class="page-title-row">
+            <div>
+              <h1 class="page-title">Laporan Pertanggungjawaban (LPJ) Kas RT</h1>
+              <p class="page-subtitle">Format resmi siap dipresentasikan saat rapat warga <span class="display-rt-name">RT</span> atau dibagikan via grup WhatsApp</p>
+            </div>
+            <div style="display: flex; gap: 10px;">
+              <button class="btn-teal-pill btn-download-report">
+                <svg viewBox="0 0 24 24" fill="none"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                <span>Cetak / Simpan PDF</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Interactive Live Preview Frame of the Document -->
+          <div style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 16px; overflow: hidden; height: 620px; box-shadow: 0 4px 16px rgba(0,0,0,0.06);">
+            <iframe id="reportPreviewIframe" style="width: 100%; height: 100%; border: none;"></iframe>
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             VIEW 7: WARGA - IURAN RUMAH SAYA (Warga Only)
+             ================================================================== -->
+        <section id="view-warga-iuran" class="view-panel">
+          <div class="page-title-row">
+            <div>
+              <h1 class="page-title" id="wargaIuranTitle">Riwayat Iuran Rumah Saya</h1>
+              <p class="page-subtitle">Status iuran 12 bulan dan unduh bukti tanda terima kwitansi resmi</p>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+              <select id="wargaIuranYearSelect" class="form-control" onchange="App.onWargaIuranYearChange(this.value)" style="width: auto; border-radius: 9999px; height: 38px; font-size: 13px; padding: 0 14px; background: #f0fdfa; border: 1px solid #0d9488; font-weight: 700; color: #0f766e;" title="Pilih Periode Tahun Iuran">
+                <option value="2025">Tahun 2025</option>
+                <option value="2026">Tahun 2026</option>
+                <option value="2027">Tahun 2027</option>
+                <option value="2028">Tahun 2028</option>
+              </select>
+              <button class="btn-teal-pill" onclick="App.openModal('modalKonfirmasiWarga')">
+                💳 Konfirmasi / Bayar Iuran
+              </button>
+            </div>
+          </div>
+
+          <!-- Matriks 12 Bulan Rumah Warga -->
+          <div class="data-table-container" style="margin-bottom: 24px;">
+            <table class="app-table">
+              <thead>
+                <tr>
+                  <th>Bulan</th>
+                  <th>Nominal Tagihan</th>
+                  <th>Status Pembayaran</th>
+                  <th style="text-align: right;">Bukti Kwitansi</th>
+                </tr>
+              </thead>
+              <tbody id="wargaPersonalMatrixBody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Transaksi Tercatat -->
+          <h2 class="section-heading" style="margin-bottom: 14px;">Catatan Pembayaran Tercatat</h2>
+          <div class="data-table-container">
+            <table class="app-table">
+              <thead>
+                <tr>
+                  <th style="width: 35px;">No</th>
+                  <th>Tanggal</th>
+                  <th>Keterangan / Transaksi</th>
+                  <th>Nominal</th>
+                  <th style="width: 60px; text-align: center;">Kwitansi</th>
+                </tr>
+              </thead>
+              <tbody id="wargaPersonalTxBody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             VIEW 8: WARGA - BIODATA KELUARGA (Warga Only)
+             ================================================================== -->
+        <section id="view-warga-profil" class="view-panel">
+          <div class="page-title-row">
+            <div>
+              <h1 class="page-title">Biodata & Keluarga Saya</h1>
+              <p class="page-subtitle">Informasi data kependudukan keluarga terdaftar di RT</p>
+            </div>
+          </div>
+
+          <div id="wargaProfileContainer">
+            <!-- Dynamically populated -->
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             VIEW 9: REKAPITULASI & SETORAN KAS BLOK (Pengurus & Petugas)
+             ================================================================== -->
+        <section id="view-setoran-blok" class="view-panel">
+          <div id="setoranBlokContainer">
+            <!-- Dynamically populated via App.renderSetoranBlok() -->
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             VIEW 10: MANAJEMEN PETUGAS PENAGIH BLOK (Pengurus Only)
+             ================================================================== -->
+        <section id="view-kelola-petugas" class="view-panel">
+          <div id="kelolaPetugasPageContainer">
+            <!-- Dynamically populated via App.renderKelolaPetugasPage() -->
+          </div>
+        </section>
+
+      </div>
+    </main>
+
+  </div>
+
+  <!-- ========================================================================
+       MOBILE BOTTOM NAVIGATION BAR (< 1024px)
+       ======================================================================== -->
+  <nav class="bottom-nav">
+    <div class="bottom-nav-item active" data-tab="dashboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span>Dashboard</span>
+    </div>
+
+    <!-- Petugas Only Items -->
+    <div class="bottom-nav-item petugas-only" data-tab="iuran" style="display: none;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg>
+      <span>Tagih</span>
+    </div>
+    <div class="bottom-nav-item petugas-only" data-tab="setoran-blok" style="display: none;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 9V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M15 13v4"/><path d="M13 15h4"/></svg>
+      <span>Setor</span>
+    </div>
+
+    <!-- Pengurus Only Items -->
+    <div class="bottom-nav-item pengurus-only" data-tab="warga">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <span>Warga</span>
+    </div>
+    <div class="fab-add pengurus-only" title="Catat Cepat" onclick="App.openModal('modalCatatKas')">
+      <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </div>
+    <div class="bottom-nav-item pengurus-only" data-tab="kas">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      <span>Buku Kas</span>
+    </div>
+    <div class="bottom-nav-item pengurus-only" data-tab="iuran">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg>
+      <span>Iuran</span>
+    </div>
+    <div class="bottom-nav-item pengurus-only" data-tab="setoran-blok">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 9V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M15 13v4"/><path d="M13 15h4"/></svg>
+      <span>Setoran</span>
+    </div>
+
+    <!-- Warga Only Items -->
+    <div class="bottom-nav-item warga-only" data-tab="warga-iuran">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg>
+      <span>Iuran Saya</span>
+    </div>
+    <div class="bottom-nav-item warga-only" data-tab="kas">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      <span>Kas RT</span>
+    </div>
+    <div class="bottom-nav-item warga-only" data-tab="warga-profil">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <span>Keluarga</span>
+    </div>
+  </nav>
+
+  <!-- ========================================================================
+       MODAL: TAMBAH / EDIT ANGGOTA KELUARGA (Fixing Point 2)
+       ======================================================================== -->
+  <div class="modal-overlay" id="modalAnggotaKeluarga">
+    <div class="modal-card" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modalAnggotaKeluargaTitle">Tambah Anggota Keluarga</h3>
+        <button class="btn-close-modal">&times;</button>
+      </div>
+      <form id="formAnggotaKeluarga" onsubmit="App.saveFamilyMemberSubmit(event)">
+        <input type="hidden" id="familyMemberId">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Nama Lengkap Anggota Keluarga *</label>
+            <input type="text" id="fmNama" class="form-control" placeholder="Contoh: Siti Aminah" required>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Hubungan dengan KK *</label>
+              <select id="fmHubungan" class="form-control" required>
+                <option value="Istri">Istri</option>
+                <option value="Suami">Suami</option>
+                <option value="Anak">Anak</option>
+                <option value="Orang Tua">Orang Tua / Mertua</option>
+                <option value="Famili Lain">Famili Lain</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Jenis Kelamin *</label>
+              <select id="fmJenisKelamin" class="form-control" required>
+                <option value="Laki-laki">Laki-laki</option>
+                <option value="Perempuan">Perempuan</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">NIK (16 Digit)</label>
+              <input type="text" id="fmNik" class="form-control" placeholder="327501...">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Tanggal Lahir</label>
+              <input type="date" id="fmTanggalLahir" class="form-control">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Status Kepemilikan KTP *</label>
+            <select id="fmPunyaKtp" class="form-control" onchange="App.toggleKtpUploadField(this.value)">
+              <option value="true">Sudah Memiliki KTP (Wajib KTP)</option>
+              <option value="false">Belum Memiliki KTP (Anak / Balita di bawah 17 th)</option>
+            </select>
+          </div>
+
+          <!-- Upload Foto KTP Section -->
+          <div id="sectionUploadKtp" class="form-group" style="margin-top: 10px;">
+            <label class="form-label">Foto / Scan KTP Asli</label>
+            <div id="ktpPreviewBox" style="display: none; margin-bottom: 8px;">
+              <img id="imgKtpPreview" src="" alt="Preview KTP" style="width: 100%; max-height: 160px; object-fit: cover; border-radius: 10px; border: 1px solid #cbd5e1;">
+              <button type="button" class="btn-outline-pill" style="font-size: 11px; padding: 3px 8px; margin-top: 4px; color: #ef4444;" onclick="App.removeKtpPhoto()">Hapus Foto KTP</button>
+            </div>
+            <div id="ktpUploadArea" class="upload-dropzone" onclick="document.getElementById('inputKtpFile').click()">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#148878" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+              <div style="font-size: 12.5px; font-weight: 700; color: #1e293b; margin-top: 4px;">Pilih Foto KTP</div>
+              <div style="font-size: 11px; color: #64748b;">Format JPG/PNG (Kamera HP / Galeri)</div>
+            </div>
+            <input type="file" id="inputKtpFile" accept="image/*" style="display: none;" onchange="App.handleKtpUpload(event)">
+            <input type="hidden" id="fmFotoKtpBase64">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-outline-pill btn-close-modal">Batal</button>
+          <button type="submit" class="btn-teal-pill">Simpan Data Anggota</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       MODAL: LIHAT FOTO DOKUMEN PENUH (KTP / KK)
+       ======================================================================== -->
+  <div class="modal-overlay" id="modalPreviewDokumen">
+    <div class="modal-card" style="max-width: 680px; text-align: center;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="previewDokumenTitle">Lihat Dokumen</h3>
+        <button class="btn-close-modal">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 16px;">
+        <img id="imgDokumenFull" src="" alt="Dokumen Penuh" style="max-width: 100%; max-height: 75vh; border-radius: 12px; object-fit: contain; box-shadow: 0 4px 16px rgba(0,0,0,0.1);">
+      </div>
+      <div class="modal-footer" style="justify-content: center; gap: 10px;">
+        <a id="btnBukaDokumenTab" href="#" target="_blank" class="btn-outline-pill" style="font-size: 12px; padding: 6px 14px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          <span>Buka di Tab Baru / Unduh</span>
+        </a>
+        <button type="button" class="btn-teal-pill btn-close-modal">Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       MODAL: DETAIL ANGGOTA KELUARGA & DOKUMEN KK/KTP (Untuk Pengurus RT)
+       ======================================================================== -->
+  <div class="modal-overlay" id="modalDetailWargaAdmin">
+    <div class="modal-card" style="max-width: 720px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modalDetailWargaTitle">Data Anggota Keluarga & Dokumen</h3>
+        <button class="btn-close-modal">&times;</button>
+      </div>
+      <div class="modal-body" id="modalDetailWargaContent">
+        <!-- Dynamically rendered -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-teal-pill btn-close-modal">Selesai / Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden alias for roleModal to prevent any undefined references -->
+  <div id="roleModal" style="display: none;"></div>
+
+  <!-- ========================================================================
+       MODAL: TAMBAH / EDIT DATA WARGA
+       ======================================================================== -->
+  <div class="modal-overlay" id="modalTambahWarga">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modalTambahWargaTitle">Tambah Data Warga Baru</h3>
+        <button class="btn-close-modal">&times;</button>
+      </div>
+      <form id="modalTambahWargaForm" onsubmit="App.saveResidentModal(event)">
+        <input type="hidden" id="residentFormId">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Nama Kepala Keluarga (KK) *</label>
+            <input type="text" id="wargaNama" class="form-control" placeholder="Contoh: Hendra Pratama" required>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">NIK (Nomor Induk Kependudukan)</label>
+              <input type="text" id="wargaNik" class="form-control" placeholder="16 digit NIK">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Nomor Kartu Keluarga (No KK)</label>
+              <input type="text" id="wargaNoKk" class="form-control" placeholder="16 digit No KK">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <label class="form-label">Blok *</label>
+                <button type="button" class="btn-outline-pill" style="padding: 2px 8px; font-size: 11px;" onclick="App.openKelolaBlokModal()">+ Kelola Blok</button>
+              </div>
+              <select id="wargaBlok" class="form-control">
+                <!-- Dynamically populated by renderBlockOptions() -->
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Nomor Rumah *</label>
+              <input type="text" id="wargaNoRumah" class="form-control" placeholder="Contoh: 12" required>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Nomor WhatsApp *</label>
+              <input type="text" id="wargaPhone" class="form-control" placeholder="Contoh: 081234567890" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Jumlah Anggota Keluarga</label>
+              <input type="number" id="wargaJumlahAnggota" class="form-control" value="3" min="1">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Status Hunian</label>
+              <select id="wargaStatusHunian" class="form-control">
+                <option value="Pemilik Tetap">Pemilik Tetap</option>
+                <option value="Kontrak">Kontrak / Sewa</option>
+                <option value="Kos">Kos</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Profesi / Pekerjaan</label>
+              <input type="text" id="wargaPekerjaan" class="form-control" placeholder="Contoh: Karyawan BUMN">
+            </div>
+          </div>
+
+          <!-- Password Akun Warga -->
+          <div class="form-group" style="margin-top: 10px;">
+            <label class="form-label" style="display: flex; justify-content: space-between;">
+              <span>Password Akun Login Warga *</span>
+              <span style="font-size: 11px; color: #64748b; font-weight: normal;">Digunakan warga untuk masuk sistem</span>
+            </label>
+            <div style="position: relative; display: flex; align-items: center;">
+              <input type="password" id="wargaPassword" class="form-control" placeholder="Masukkan password akun warga (default: 123456)" required style="padding-right: 42px;">
+              <button type="button" class="btn-eye-toggle" onclick="App.toggleInputPassword('wargaPassword', this)" title="Lihat/Sembunyikan Password">
+                👁️
+              </button>
+            </div>
+            <span style="font-size: 11px; color: #94a3b8;">Pengurus/Admin dapat melihat atau mengubah password ini jika warga lupa.</span>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-outline-pill btn-close-modal">Batal</button>
+          <button type="submit" class="btn-teal-pill">Simpan Data Warga</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       MODAL: CATAT KAS MASUK / KELUAR
+       ======================================================================== -->
+  <div class="modal-overlay" id="modalCatatKas">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Pencatatan Kas Masuk / Kas Keluar</h3>
+        <button class="btn-close-modal">&times;</button>
+      </div>
+      <form onsubmit="App.saveTransactionModal(event)">
+        <div class="modal-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Jenis Kas *</label>
+              <select id="txTipe" class="form-control" onchange="App.onTxTypeChange(this.value)">
+                <option value="masuk">📥 Kas Masuk (Penerimaan)</option>
+                <option value="keluar">📤 Kas Keluar (Pengeluaran Operasional)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <label class="form-label" style="margin-bottom: 0;">Kategori *</label>
+                <button type="button" class="btn-outline-pill pengurus-only" style="padding: 2px 8px; font-size: 11px;" onclick="App.openKelolaKategoriModal()">+ Kelola Kategori</button>
+              </div>
+              <select id="txKategori" class="form-control">
+                <!-- Dynamically populated by App.renderTxCategoryOptions() -->
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Judul Transaksi *</label>
+            <input type="text" id="txJudul" class="form-control" placeholder="Contoh: Iuran Warga Bpk. Hendra - Blok A1/12" required>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Nominal (Rupiah) *</label>
+              <input type="number" id="txNominal" class="form-control" placeholder="150000" min="1000" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Tanggal Transaksi</label>
+              <input type="date" id="txTanggal" class="form-control">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Metode Pembayaran</label>
+              <select id="txMetode" class="form-control">
+                <option value="Transfer BCA">Transfer BCA</option>
+                <option value="QRIS RT">QRIS RT</option>
+                <option value="Kas Tunai">Kas Tunai</option>
+                <option value="Transfer Mandiri">Transfer Mandiri / Lainnya</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Warga Terkait (Opsional)</label>
+              <select id="txWargaSelect" class="form-control">
+                <option value="">- Bukan dari warga tertentu -</option>
+                <option value="W-001">Bpk. Bambang Sutrisno (A1/01)</option>
+                <option value="W-002">Bpk. Hendra Pratama (A1/12)</option>
+                <option value="W-003">Bpk. Agus Setiawan (A2/04)</option>
+                <option value="W-004">Bpk. Dedi Supriyadi (A2/09)</option>
+                <option value="W-005">Bpk. Wawan Kurniawan (B1/03)</option>
+                <option value="W-006">Bpk. Eko Prasetyo (B1/08)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Catatan / Keterangan</label>
+            <textarea id="txKeterangan" class="form-control" placeholder="Keterangan tambahan transaksi..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-outline-pill btn-close-modal">Batal</button>
+          <button type="submit" class="btn-teal-pill">Simpan Transaksi</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       MODAL: CATAT TALANGAN BARU
+       ======================================================================== -->
+  <div class="modal-overlay" id="modalCatatTalangan">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Pencatatan Dana Talangan / Utang Kas RT</h3>
+        <button class="btn-close-modal">&times;</button>
+      </div>
+      <form onsubmit="App.saveTalanganModal(event)">
+        <div class="modal-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Nama Peminjam / Penanggung Jawab *</label>
+              <input type="text" id="talanganNama" class="form-control" placeholder="Contoh: Bpk. Wawan" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Blok / Keterangan Rumah *</label>
+              <input type="text" id="talanganBlok" class="form-control" placeholder="Contoh: Blok B1/03" required>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Nominal Talangan (Rp) *</label>
+              <input type="number" id="talanganNominal" class="form-control" placeholder="1000000" min="10000" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Batas Waktu / Jatuh Tempo *</label>
+              <input type="date" id="talanganTempo" class="form-control" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Tanggal Pengeluaran Pinjaman</label>
+            <input type="date" id="talanganTanggal" class="form-control">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Keperluan / Alasan Talangan *</label>
+            <input type="text" id="talanganKeperluan" class="form-control" placeholder="Contoh: Bantuan darurat berobat anggota keluarga" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Kesepakatan / Catatan Pengurus</label>
+            <textarea id="talanganKeterangan" class="form-control" placeholder="Contoh: Disetujui dicicil 2 kali pembayaran"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-outline-pill btn-close-modal">Batal</button>
+          <button type="submit" class="btn-teal-pill">Simpan Catatan Talangan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       MODAL: BLAST PENGINGAT WHATSAPP
+       ======================================================================== -->
+  <div class="modal-overlay" id="modalWaReminder">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Pengingat Pembayaran Iuran via WhatsApp</h3>
+        <button class="btn-close-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 13px; color: #64748b;">
+          Daftar warga yang belum melunasi iuran bulan berjalan. Klik tombol WhatsApp untuk langsung membuka chat dengan pesan tagihan yang sudah disiapkan otomatis:
+        </p>
+        <div id="waReminderList" style="max-height: 380px; overflow-y: auto;">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-outline-pill btn-close-modal">Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       MODAL: KONFIRMASI BAYAR (WARGA)
+       ======================================================================== -->
+  <div class="modal-overlay" id="modalKonfirmasiWarga">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Konfirmasi Pembayaran Iuran Warga</h3>
+        <button class="btn-close-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px;">
+          <div style="font-size: 11px; color: #64748b; font-weight: bold;">REKENING RESMI <span class="display-rt-name">RT</span>:</div>
+          <div style="font-size: 15px; font-weight: 800; color: #0f766e; margin-top: 4px;" class="display-rekening-rt">BCA: 873-019-2810</div>
+          <div style="font-size: 12px; color: #334155;">a/n KAS <span class="display-rt-name">RT</span> <span class="display-perumahan"></span></div>
+          <div style="font-size: 12px; color: #64748b; margin-top: 6px;">Nominal Iuran Wajib: <strong id="displayIuranWajibModal">Rp 150.000 / bulan</strong></div>
+        </div>
+
+        <div class="form-group" style="margin-top: 10px;">
+          <label class="form-label">Metode Yang Digunakan</label>
+          <select id="wargaKonfirmasiMetode" class="form-control">
+            <option>Transfer Bank BCA</option>
+            <option>QRIS RT</option>
+            <option>Titip Tunai ke Bendahara</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Catatan Tambahan (Opsional)</label>
+          <input type="text" id="wargaKonfirmasiNote" class="form-control" placeholder="Contoh: Sudah ditransfer via BCA Mobile jam 09:30">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-outline-pill btn-close-modal">Batal</button>
+        <button type="button" class="btn-teal-pill" onclick="
+          alert('Konfirmasi pembayaran telah terkirim! Status iuran Anda akan diverifikasi oleh Bendahara RT.');
+          App.closeModal('modalKonfirmasiWarga');
+        ">Kirim Konfirmasi</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       MODAL: KELOLA MASTER BLOK RT (Fixing Point 1)
+       ======================================================================== -->
+  <div class="modal-overlay" id="modalKelolaBlok">
+    <div class="modal-card" style="max-width: 500px;">
+      <div class="modal-header">
+        <h3 class="modal-title" style="display: flex; align-items: center; gap: 8px;">
+          <span>🏢 Kelola Master Blok Lingkungan</span>
+        </h3>
+        <button class="btn-close-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 13px; color: #64748b; margin-bottom: 12px;">
+          Sesuaikan nama blok, gang, atau cluster perumahan Anda. Perubahan akan otomatis terhubung ke seluruh data warga.
+        </p>
+
+        <!-- Form Tambah Blok -->
+        <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+          <input type="text" id="newBlockInput" class="form-control" placeholder="Contoh: Blok Melati / Gang 3">
+          <button type="button" class="btn-teal-pill" style="white-space: nowrap;" onclick="App.addBlock()">
+            + Tambah
+          </button>
+        </div>
+
+        <div style="font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 8px;">Daftar Blok Terdaftar Saat Ini:</div>
+        <div id="blocksListContainer" style="max-height: 280px; overflow-y: auto;">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-teal-pill btn-close-modal">Selesai</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       MODAL: KELOLA KATEGORI TRANSAKSI KAS RT (Menu Tersendiri)
+       ======================================================================== -->
+  <div class="modal-overlay" id="modalKelolaKategori">
+    <div class="modal-card" style="max-width: 540px;">
+      <div class="modal-header">
+        <h3 class="modal-title" style="display: flex; align-items: center; gap: 8px;">
+          <span>🏷️ Kelola Kategori Transaksi Kas RT</span>
+        </h3>
+        <button class="btn-close-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 12.5px; color: #64748b; margin-bottom: 14px;">
+          Sesuaikan kategori pemasukan (kas masuk) dan pengeluaran (kas keluar) RT. Anda dapat menambah kategori baru, mengedit nama, atau menghapus kategori yang tidak diperlukan.
+        </p>
+
+        <!-- Segmented Tab: Kas Masuk / Kas Keluar -->
+        <div style="display: flex; gap: 8px; margin-bottom: 14px; background: #f1f5f9; padding: 4px; border-radius: 10px;">
+          <button type="button" id="tabCatMasukBtn" class="btn-cat-tab active" onclick="App.switchCategoryTab('masuk')" style="flex: 1; padding: 8px 12px; font-size: 12.5px; font-weight: 700; border-radius: 8px; border: none; cursor: pointer; transition: all 0.2s; background: #0d9488; color: #ffffff;">
+            📥 Kas Masuk (Pemasukan)
+          </button>
+          <button type="button" id="tabCatKeluarBtn" class="btn-cat-tab" onclick="App.switchCategoryTab('keluar')" style="flex: 1; padding: 8px 12px; font-size: 12.5px; font-weight: 700; border-radius: 8px; border: none; cursor: pointer; transition: all 0.2s; background: transparent; color: #64748b;">
+            📤 Kas Keluar (Pengeluaran)
+          </button>
+        </div>
+
+        <!-- Form Tambah Kategori -->
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 14px; margin-bottom: 16px;">
+          <label class="form-label" style="font-size: 12px; font-weight: 700; margin-bottom: 6px; display: block;" id="labelAddCategory">Tambah Kategori Kas Masuk Baru:</label>
+          <div style="display: flex; gap: 8px;">
+            <input type="text" id="newCategoryInput" class="form-control" placeholder="Contoh: Bantuan Posyandu / Parkir Warga" onkeydown="if(event.key === 'Enter'){ event.preventDefault(); App.addCategory(); }">
+            <button type="button" class="btn-teal-pill" style="white-space: nowrap; padding: 8px 16px;" onclick="App.addCategory()">
+              + Tambah
+            </button>
+          </div>
+        </div>
+
+        <!-- Daftar Kategori Aktif -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <div style="font-size: 12px; font-weight: 700; color: #475569;" id="categoryListHeading">Daftar Kategori Kas Masuk:</div>
+          <span style="font-size: 11px; color: #94a3b8; font-weight: 600;" id="categoryCountBadge">0 Kategori</span>
+        </div>
+        <div id="categoryListContainer" style="max-height: 280px; overflow-y: auto; padding-right: 4px;">
+          <!-- Dynamically populated by App.renderCategoryList() -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-teal-pill btn-close-modal">Selesai</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       MODAL: PENGATURAN RT & LINGKUNGAN (Fixing Point 4)
+       ======================================================================== -->
+  <div class="modal-overlay" id="modalPengaturanRT">
+    <div class="modal-card" style="max-width: 580px;">
+      <div class="modal-header">
+        <h3 class="modal-title" style="display: flex; align-items: center; gap: 8px;">
+          <span>⚙️ Pengaturan RT & Lingkungan</span>
+        </h3>
+        <button class="btn-close-modal">&times;</button>
+      </div>
+      <form onsubmit="App.savePengaturanSubmit(event)">
+        <div class="modal-body">
+          <p style="font-size: 13px; color: #64748b; margin-bottom: 12px;">
+            Sesuaikan identitas RT, nama perumahan, susunan pengurus, dan rekening kas. Perubahan akan langsung tampil di logo, dashboard, dan laporan LPJ resmi.
+          </p>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Nama RT & RW *</label>
+              <input type="text" id="setRtName" class="form-control" placeholder="Contoh: RT 03 / RW 05" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Nama Perumahan / Lingkungan *</label>
+              <input type="text" id="setPerumahan" class="form-control" placeholder="Contoh: Perumahan Griya Indah" required>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Kelurahan / Desa</label>
+              <input type="text" id="setKelurahan" class="form-control" placeholder="Sukamaju">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Kecamatan</label>
+              <input type="text" id="setKecamatan" class="form-control" placeholder="Cilodong">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Kota / Kabupaten</label>
+              <input type="text" id="setKota" class="form-control" placeholder="Kota Depok">
+            </div>
+            <div class="form-group">
+              <label class="form-label">No WhatsApp Kontak RT</label>
+              <input type="text" id="setContactWa" class="form-control" placeholder="081234567801">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Nama Ketua RT</label>
+              <input type="text" id="setKetuaRt" class="form-control" placeholder="Bpk. Bambang Sutrisno">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Nama Bendahara RT</label>
+              <input type="text" id="setBendahara" class="form-control" placeholder="Ibu Siti Rahmawati">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Nama Sekretaris RT</label>
+              <input type="text" id="setSekretaris" class="form-control" placeholder="Bpk. Arif Wijaya">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Nomor Rekening Kas RT *</label>
+              <input type="text" id="setRekeningRt" class="form-control" placeholder="BCA 873-019-2810 a/n KAS RT" required>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Iuran Wajib Bulanan (Rp) *</label>
+              <input type="number" id="setIuranBulanan" class="form-control" placeholder="150000" min="0" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Iuran Sosial / Kematian (Rp)</label>
+              <input type="number" id="setIuranSosial" class="form-control" placeholder="20000" min="0">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-outline-pill btn-close-modal">Batal</button>
+          <button type="submit" class="btn-teal-pill">Simpan Pengaturan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       MODAL: PENGATURAN DATABASE GOOGLE SHEETS & CLOUD SYNC
+       ======================================================================== -->
+  <div class="modal-overlay" id="modalCloudSync">
+    <div class="modal-card" style="max-width: 620px;">
+      <div class="modal-header">
+        <h3 class="modal-title" style="display: flex; align-items: center; gap: 8px;">
+          <span>📊 Database Google Sheets & Cloud Sync</span>
+        </h3>
+        <button class="btn-close-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        
+        <!-- Status Box -->
+        <div id="modalCloudStatus" style="margin-bottom: 12px;"></div>
+        
+        <p style="font-size: 13px; color: #475569; line-height: 1.5;">
+          Hubungkan RukunKu ke Google Sheets menggunakan <strong>Google Apps Script</strong> gratis. Data warga, kas, dan iuran akan tersimpan otomatis di Google Drive Anda dan dapat diakses bersamaan oleh pengurus RT melalui laptop maupun smartphone.
+        </p>
+
+        <div class="form-group" style="margin-top: 10px;">
+          <label class="form-label" style="display: flex; justify-content: space-between;">
+            <span>URL Web App Google Apps Script *</span>
+            <span id="cloudLastSyncText" style="font-size: 11px; color: #64748b; font-weight: normal;"></span>
+          </label>
+          <input type="url" id="inputGasUrl" class="form-control" placeholder="https://script.google.com/macros/s/.../exec" style="font-family: monospace; font-size: 12px;">
+        </div>
+
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px;">
+          <button type="button" class="btn-teal-pill" style="font-size: 12px; padding: 7px 14px;" onclick="
+            const val = document.getElementById('inputGasUrl').value.trim();
+            CloudSync.testConnection(val);
+          ">
+            ⚡ Tes Koneksi
+          </button>
+          <button type="button" class="btn-outline-pill" style="font-size: 12px; padding: 7px 14px;" onclick="CloudSync.pullFromSheets()">
+            ⬇️ Tarik Data dari Sheet
+          </button>
+          <button type="button" class="btn-outline-pill" style="font-size: 12px; padding: 7px 14px;" onclick="CloudSync.pushToSheets()">
+            ⬆️ Kirim Data Lokal ke Sheet
+          </button>
+          <button type="button" class="btn-outline-pill" style="font-size: 12px; padding: 7px 14px; color: #dc2626;" onclick="
+            if (confirm('Putuskan koneksi ke Google Sheets dan kembali menggunakan database lokal?')) {
+              CloudSync.setGasUrl('');
+              document.getElementById('inputGasUrl').value = '';
+              CloudSync.updateStatusUI();
+            }
+          ">
+            🔌 Putuskan
+          </button>
+        </div>
+
+        <!-- Info Kolom Password -->
+        <div style="background: #f0fdfa; border: 1px solid #ccfbf1; border-radius: 10px; padding: 10px 14px; margin-top: 12px; font-size: 11.5px; color: #0f766e;">
+          <strong>💡 Kolom Password di Google Sheets:</strong> Password warga tersimpan di sheet <strong>Warga</strong> (Kolom O). Jika kolom ini belum muncul di spreadsheet Anda, klik tombol <em>"⬆️ Kirim Data Lokal ke Sheet"</em> untuk memperbarui tabel Google Sheets secara otomatis.
+        </div>
+
+        <!-- Panduan Singkat -->
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 14px; margin-top: 14px; font-size: 12px; color: #334155;">
+          <div style="font-weight: 700; margin-bottom: 6px; color: #0f766e;">Cara Cepat Mendapatkan URL Google Apps Script:</div>
+          <ol style="margin-left: 18px; line-height: 1.6;">
+            <li>Buka spreadsheet baru di <a href="https://sheets.new" target="_blank" style="color: #0f766e; font-weight: bold;">sheets.new</a></li>
+            <li>Buka menu <strong>Ekstensi &gt; Apps Script</strong></li>
+            <li>Salin seluruh isi kode dari file <code>google-apps-script/Code.gs</code> lalu tempelkan.</li>
+            <li>Klik tombol <strong>Deploy &gt; New deployment</strong>, pilih jenis <strong>Web app</strong>.</li>
+            <li>Ubah <em>Who has access</em> menjadi <strong>Anyone</strong> (Wajib agar bisa diakses aplikasi).</li>
+            <li>Salin <strong>Web app URL</strong> (/exec) lalu tempelkan pada kolom input di atas.</li>
+          </ol>
+          <div style="margin-top: 10px;">
+            <button type="button" class="btn-outline-pill" style="font-size: 11.5px; padding: 4px 10px;" onclick="
+              alert('Panduan lengkap dan file Code.gs tersedia di:\nd:\\ANTIGRAFITY\\RukunKu\\google-apps-script\\PANDUAN_SETUP_GOOGLE_SHEETS.md');
+            ">
+              📖 Buka Lokasi File Code.gs & Panduan
+            </button>
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-teal-pill btn-close-modal">Selesai / Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       MODAL: SETOR KAS KE BENDAHARA UTAMA (Untuk Petugas Penagih Blok)
+       ======================================================================== -->
+  <div class="modal-overlay" id="modalSetorKasBlok">
+    <div class="modal-card" style="max-width: 540px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modalSetorKasTitle">📤 Setor Kas Iuran ke Bendahara Utama</h3>
+        <button class="btn-close-modal">&times;</button>
+      </div>
+      <form id="formSetorKasBlok" onsubmit="App.saveSetoranBlokSubmit(event)">
+        <div class="modal-body">
+          <div style="background: #f0fdfa; border: 1px solid #ccfbf1; border-radius: 12px; padding: 12px 14px; margin-bottom: 14px;">
+            <div style="font-size: 13.5px; font-weight: 800; color: #0f766e;" id="setorPetugasInfo">Petugas: Bpk. Hendra Pratama (Blok A)</div>
+            <div style="font-size: 12px; color: #64748b; margin-top: 2px;">Dana yang diserahkan akan resmi masuk ke Kas Utama RT setelah diverifikasi & dikonfirmasi oleh Bendahara.</div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group" style="flex: 1;">
+              <label class="form-label">Tahun *</label>
+              <select id="setorTahun" class="form-control" onchange="App.calculateCollectorPendingRemittance()">
+                <option value="2025">2025</option>
+                <option value="2026">2026</option>
+                <option value="2027">2027</option>
+                <option value="2028">2028</option>
+              </select>
+            </div>
+            <div class="form-group" style="flex: 2;">
+              <label class="form-label">Periode Bulan Iuran *</label>
+              <select id="setorBulan" class="form-control" onchange="App.calculateCollectorPendingRemittance()">
+                <option value="1">Januari</option>
+                <option value="2">Februari</option>
+                <option value="3">Maret</option>
+                <option value="4">April</option>
+                <option value="5">Mei</option>
+                <option value="6">Juni</option>
+                <option value="7">Juli</option>
+                <option value="8">Agustus</option>
+                <option value="9">September</option>
+                <option value="10" selected>Oktober</option>
+                <option value="11">November</option>
+                <option value="12">Desember</option>
+              </select>
+            </div>
+            <div class="form-group" style="flex: 2;">
+              <label class="form-label">Tanggal Penyerahan *</label>
+              <input type="date" id="setorTanggal" class="form-control" required>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Jumlah KK Terbayar</label>
+              <input type="number" id="setorJumlahKk" class="form-control" readonly style="background: #f8fafc; font-weight: bold;">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Total Nominal Setoran (Rp) *</label>
+              <input type="number" id="setorNominal" class="form-control" required style="font-weight: 800; color: #0d9488; font-size: 15px;">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Metode Penyerahan Kas *</label>
+            <select id="setorMetode" class="form-control">
+              <option value="Tunai Fisik">💵 Uang Tunai Fisik (Diserahkan langsung ke Bendahara)</option>
+              <option value="Transfer Bank RT">💳 Transfer ke Rekening Kas RT</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Catatan Serah Terima / Rincian</label>
+            <textarea id="setorCatatan" class="form-control" rows="2" placeholder="Contoh: Setoran uang tunai iuran 8 KK Blok A diserahkan langsung ke Bu Siti"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Foto Bukti Penyerahan / Resi Transfer (Opsional)</label>
+            <input type="file" id="setorFotoFile" accept="image/*" class="form-control" onchange="App.handleSetoranPhotoUpload(event)">
+            <input type="hidden" id="setorFotoBase64">
+            <div id="setorFotoPreviewBox" style="display: none; margin-top: 8px;">
+              <img id="imgSetorFotoPreview" src="" alt="Pratinjau Bukti" style="max-height: 120px; border-radius: 8px; border: 1px solid #cbd5e1;">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-outline-pill btn-close-modal">Batal</button>
+          <button type="submit" class="btn-teal-pill">
+            <span>📤 Kirim Pengajuan Setoran</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       MODAL: KELOLA AKUN PETUGAS PENAGIH BLOK (Untuk Bendahara / Pengurus RT)
+       ======================================================================== -->
+  <div class="modal-overlay" id="modalKelolaPetugas">
+    <div class="modal-card" style="max-width: 680px;">
+      <div class="modal-header">
+        <h3 class="modal-title">👥 Kelola Petugas Penagih Blok</h3>
+        <button class="btn-close-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+          <p style="font-size: 12.5px; color: #64748b; margin: 0;">
+            Kelola akun petugas penagih iuran untuk masing-masing blok di lingkungan RT.
+          </p>
+          <button type="button" class="btn-teal-pill" style="font-size: 12px; padding: 6px 14px;" onclick="App.openAddPetugasForm()">
+            + Tambah Petugas Blok Baru
+          </button>
+        </div>
+
+        <!-- Form Tambah / Edit Petugas (Hidden by default) -->
+        <div id="formPetugasWrapper" style="display: none; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px; margin-bottom: 16px;">
+          <h4 id="formPetugasTitle" style="font-size: 14px; font-weight: 800; color: #0f766e; margin: 0 0 12px 0;">Tambah Petugas Blok Baru</h4>
+          <form id="formPetugasBlok" onsubmit="App.savePetugasSubmit(event)">
+            <input type="hidden" id="petugasFormId">
+            <input type="hidden" id="petugasResidentId">
+            <input type="hidden" id="petugasBlokAsal">
+
+            <div class="form-group" style="margin-bottom: 14px;">
+              <label class="form-label" style="font-weight: 700; color: #0f766e;">Pilih Warga yang Ditugaskan dari Blok RT *</label>
+              <select id="petugasPilihWarga" class="form-control" onchange="App.onSelectWargaForPetugas(this.value)">
+                <!-- Dynamically populated with all residents -->
+              </select>
+              <span style="font-size: 11px; color: #64748b;">Pilih warga dari blok untuk otomatis mengisi data petugas penagih.</span>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Nama Lengkap Petugas *</label>
+                <input type="text" id="petugasNama" class="form-control" placeholder="Contoh: Bpk. Joko Susilo" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">No. WhatsApp Aktif *</label>
+                <input type="text" id="petugasPhone" class="form-control" placeholder="08123456789" required>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Blok Tugas / Tanggung Jawab *</label>
+                <input type="text" id="petugasBlokTugas" class="form-control" placeholder="Contoh: Blok A (atau Blok Melati)" required>
+                <span style="font-size: 11px; color: #64748b;">Nama blok yang akan ditagih oleh petugas ini</span>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Username Login *</label>
+                <input type="text" id="petugasUsername" class="form-control" placeholder="Contoh: petugas_a" required>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Password Login *</label>
+              <input type="text" id="petugasPassword" class="form-control" placeholder="Password akun petugas" required value="123">
+            </div>
+
+            <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px;">
+              <button type="button" class="btn-outline-pill" style="font-size: 12px; padding: 6px 14px;" onclick="document.getElementById('formPetugasWrapper').style.display = 'none'">Batal</button>
+              <button type="submit" class="btn-teal-pill" style="font-size: 12px; padding: 6px 16px;">Simpan Petugas</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Daftar Petugas Blok -->
+        <div id="collectorListContainer" style="display: flex; flex-direction: column; gap: 10px;">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-teal-pill btn-close-modal">Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts with cache-busting -->
+  <script src="js/data.js?v=20261021_02"></script>
+  <script src="js/cloud-sync.js?v=20261021_02"></script>
+  <script src="js/report-pdf.js?v=20261021_02"></script>
+  <script src="js/app.js?v=20261021_02"></script>
+
+  <script>
+    // Set default date picker values to today (bulletproof ready check)
+    function initDatePickers() {
+      const today = new Date().toISOString().slice(0, 10);
+      const txTanggal = document.getElementById('txTanggal');
+      const talanganTanggal = document.getElementById('talanganTanggal');
+      if (txTanggal) txTanggal.value = today;
+      if (talanganTanggal) talanganTanggal.value = today;
+    }
+    if (document.readyState !== 'loading') {
+      initDatePickers();
+    } else {
+      document.addEventListener('DOMContentLoaded', initDatePickers);
+    }
+  </script>
+</body>
+</html>
