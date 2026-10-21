@@ -5,7 +5,7 @@
 
 const CloudSync = {
   // URL Web App Google Apps Script default lingkungan RT 05 / RW 02 Perum Tiara Candi 3
-  DEFAULT_GAS_URL: 'https://script.google.com/macros/s/AKfycbwCPlpqo5DMqRgnz1QCksWw6M3tBPwCU0-LX0iDZnZcluMN6CDo6C6qRCSOdJIfFXFJYg/exec',
+  DEFAULT_GAS_URL: 'https://script.google.com/macros/s/AKfycbxN-hWB9wZLcKLuUEA2dXX2D23DPrTHPYYkJwmmViq2EdFbwvg0KYEXvAUQFL1FU6JW6w/exec',
   STORAGE_KEY_URL: 'rukunku_gas_url',
   STORAGE_KEY_LAST_SYNC: 'rukunku_last_sync_time',
   
