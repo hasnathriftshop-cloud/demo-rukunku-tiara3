@@ -78,6 +78,10 @@ const App = {
     this.updateSettingsUI();
     this.renderBlockOptions();
 
+    window.addEventListener('resize', () => {
+      this.applyWargaViewMode();
+    });
+
     // Multi-tab / cross-window real-time state synchronization
     window.addEventListener('storage', (e) => {
       if (e.key === 'rukunku_rt05_data' && e.newValue) {
@@ -271,6 +275,11 @@ const App = {
     if (targetPanel) {
       targetPanel.classList.add('active-view');
     }
+
+    // Scroll content body and window to top smoothly on tab switch
+    const contentBody = document.querySelector('.content-body');
+    if (contentBody) contentBody.scrollTop = 0;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 
     // Refresh specific view data if needed
     if (tabName === 'dashboard') {
@@ -1085,21 +1094,32 @@ const App = {
     }
   },
 
-  // Toggle Table Password Display for Admin
+  // Toggle Table & Card Password Display for Admin
   toggleTablePassword(residentId) {
     const textEl = document.getElementById(`pwdDisplay_${residentId}`);
     const eyeEl = document.getElementById(`pwdEye_${residentId}`);
-    if (!textEl) return;
-    const realPwd = textEl.getAttribute('data-real-pwd') || '123456';
-    if (textEl.textContent === '••••••') {
-      textEl.textContent = realPwd;
-      textEl.style.color = '#0d9488';
-      if (eyeEl) eyeEl.textContent = '🙈';
-    } else {
-      textEl.textContent = '••••••';
-      textEl.style.color = '#334155';
-      if (eyeEl) eyeEl.textContent = '👁️';
-    }
+    const textCardEl = document.getElementById(`pwdDisplayCard_${residentId}`);
+    const eyeCardEl = document.getElementById(`pwdEyeCard_${residentId}`);
+
+    const pairs = [
+      { text: textEl, eye: eyeEl },
+      { text: textCardEl, eye: eyeCardEl }
+    ];
+
+    pairs.forEach(p => {
+      if (p.text) {
+        const realPwd = p.text.getAttribute('data-real-pwd') || '123456';
+        if (p.text.textContent.includes('•')) {
+          p.text.textContent = realPwd;
+          p.text.style.color = '#0d9488';
+          if (p.eye) p.eye.textContent = '🙈';
+        } else {
+          p.text.textContent = '••••••';
+          p.text.style.color = '#334155';
+          if (p.eye) p.eye.textContent = '👁️';
+        }
+      }
+    });
   },
 
   // Admin resets or changes a resident's password
@@ -1586,10 +1606,45 @@ const App = {
     this.renderChart();
   },
 
+  selectChartItem(idx, chartItems) {
+    if (!Array.isArray(chartItems) || !chartItems[idx]) return;
+    AppState.chartHighlightIndex = idx;
+    const item = chartItems[idx];
+
+    // Update highlight CSS on columns without rebuilding entire DOM
+    const columns = document.querySelectorAll('#chartBarsArea .bar-column');
+    columns.forEach((c, i) => {
+      if (i === idx) {
+        c.classList.add('highlighted');
+      } else {
+        c.classList.remove('highlighted');
+      }
+    });
+
+    // Update Detail Strip
+    const dateEl = document.getElementById('chartDetailDate');
+    const countEl = document.getElementById('chartDetailCount');
+    const amountEl = document.getElementById('chartDetailAmount');
+    if (dateEl) dateEl.textContent = item.sub;
+    if (countEl) {
+      if (item.amountIn > 0) {
+        countEl.textContent = `${item.txCount || 1} transaksi kas masuk tercatat`;
+      } else {
+        countEl.textContent = 'Belum ada transaksi kas masuk pada tanggal ini';
+      }
+    }
+    if (amountEl) {
+      amountEl.textContent = Utils.formatRupiah(item.amountIn);
+      amountEl.style.color = item.amountIn > 0 ? '#0f766e' : '#64748b';
+    }
+  },
+
   renderChart() {
     const chartBarsContainer = document.getElementById('chartBarsArea');
     const xAxisContainer = document.getElementById('xAxisArea');
-    const yAxisContainer = document.querySelector('.y-axis-labels');
+    const yAxisContainer = document.getElementById('chartYAxisLabels') || document.querySelector('.y-axis-labels');
+    const chartCanvas = document.getElementById('chartBarsCanvas');
+    const scrollTrack = document.getElementById('chartScrollTrack');
     if (!chartBarsContainer || !xAxisContainer) return;
 
     chartBarsContainer.innerHTML = '';
@@ -1600,6 +1655,15 @@ const App = {
     const curMonth = AppState.selectedMonth || (new Date().getMonth() + 1);
     const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
     const transactions = this.data.transactions || [];
+
+    // Toggle monthly class for horizontal scroll width on mobile
+    if (chartCanvas) {
+      if (periodMode === 'yearly') {
+        chartCanvas.classList.remove('is-monthly');
+      } else {
+        chartCanvas.classList.add('is-monthly');
+      }
+    }
 
     // Populate period dropdown options dynamically
     const periodSelect = document.getElementById('chartPeriodSelect');
@@ -1631,8 +1695,9 @@ const App = {
         chartItems.push({
           key: m,
           label: mName,
-          sub: `${mName} ${curYear}`,
+          sub: `${monthNames[idx]} ${curYear}`,
           amountIn: sum,
+          txCount: txsInMonth.length,
           isToday: (m === curMonth)
         });
       });
@@ -1653,8 +1718,9 @@ const App = {
         chartItems.push({
           key: day,
           label: String(day),
-          sub: `${day} ${monthNames[targetMonth - 1]}`,
+          sub: `${day} ${monthNames[targetMonth - 1]} ${targetYear}`,
           amountIn: sum,
+          txCount: txsDay.length,
           isToday: isToday
         });
       }
@@ -1666,7 +1732,6 @@ const App = {
       if (todayIdx !== -1) {
         AppState.chartHighlightIndex = todayIdx;
       } else {
-        // Find highest transaction day or default to last day
         let maxIdx = 0;
         let maxVal = -1;
         chartItems.forEach((item, i) => {
@@ -1681,7 +1746,6 @@ const App = {
 
     // Calculate Max Value for scale
     const rawMax = Math.max(...chartItems.map(d => d.amountIn), 0);
-    // If no transactions, default ceiling is Rp 500.000 so scale looks natural and not empty
     const maxVal = rawMax > 0 ? Math.ceil(rawMax / 100000) * 100000 : 500000;
 
     // Update Y-Axis scale labels dynamically
@@ -1699,7 +1763,7 @@ const App = {
       const isHighlighted = idx === AppState.chartHighlightIndex;
       const heightPercent = item.amountIn > 0 
         ? Math.max(10, Math.round((item.amountIn / maxVal) * 85))
-        : 4; // subtle 4% baseline so the user can hover on any day
+        : 4; // subtle 4% baseline
 
       const col = document.createElement('div');
       col.className = `bar-column ${isHighlighted ? 'highlighted' : ''}`;
@@ -1720,10 +1784,17 @@ const App = {
         <div class="bar-body" style="height: ${heightPercent}%; ${item.amountIn === 0 ? 'background: #cbd5e1; opacity: 0.45;' : ''}"></div>
       `;
 
-      col.addEventListener('mouseenter', () => {
-        AppState.chartHighlightIndex = idx;
-        this.renderChart();
+      // Touch, Click, & Mouseenter events for effortless mobile & desktop interaction
+      col.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.selectChartItem(idx, chartItems);
       });
+      col.addEventListener('mouseenter', () => {
+        this.selectChartItem(idx, chartItems);
+      });
+      col.addEventListener('touchstart', () => {
+        this.selectChartItem(idx, chartItems);
+      }, { passive: true });
 
       chartBarsContainer.appendChild(col);
 
@@ -1732,6 +1803,20 @@ const App = {
       xItem.textContent = item.label;
       xAxisContainer.appendChild(xItem);
     });
+
+    // Initial Detail Strip Update
+    this.selectChartItem(AppState.chartHighlightIndex, chartItems);
+
+    // Auto-scroll track to center the highlighted / today bar on mobile
+    if (scrollTrack && periodMode !== 'yearly') {
+      setTimeout(() => {
+        const activeCol = chartBarsContainer.querySelector(`.bar-column[data-idx="${AppState.chartHighlightIndex}"]`);
+        if (activeCol) {
+          const scrollPos = activeCol.offsetLeft - (scrollTrack.clientWidth / 2) + (activeCol.clientWidth / 2);
+          scrollTrack.scrollLeft = Math.max(0, scrollPos);
+        }
+      }, 80);
+    }
   },
 
   // =========================================================================
@@ -2108,10 +2193,143 @@ const App = {
     if (checkAll && pageItems.length > 0) {
       checkAll.checked = pageItems.every(item => (AppState.selectedResidentIds || []).includes(item.id));
     }
+
+    // Render Mobile Cards Container
+    const cardsContainer = document.getElementById('wargaCardsContainer');
+    if (cardsContainer) {
+      cardsContainer.innerHTML = '';
+      if (pageItems.length === 0) {
+        cardsContainer.innerHTML = `
+          <div style="text-align: center; padding: 32px 16px; background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; color: #94a3b8;">
+            <div style="font-size: 28px; margin-bottom: 8px;">🔍</div>
+            <div style="font-weight: 700; color: #475569;">Tidak ada data warga ditemukan.</div>
+            <div style="font-size: 12px; margin-top: 4px;">Coba ubah kata kunci pencarian atau filter blok.</div>
+          </div>
+        `;
+      } else {
+        pageItems.forEach(r => {
+          const isSelected = (AppState.selectedResidentIds || []).includes(r.id);
+          const blockBadge = `${r.blok} No. ${r.noRumah}`;
+          let statusBadgeClass = 'badge-approved';
+          if (r.statusHunian === 'Kontrak' || r.statusHunian === 'Sewa') {
+            statusBadgeClass = 'badge-pending';
+          } else if (r.statusHunian === 'Kos' || r.statusHunian === 'Kost') {
+            statusBadgeClass = 'badge-kos';
+          }
+          const rawPhone = String(r.phone || '').trim();
+          const displayPhone = rawPhone.startsWith('62') ? ('0' + rawPhone.slice(2)) : rawPhone;
+          const waLink = `https://wa.me/${r.phone}?text=${encodeURIComponent(`Halo Bpk/Ibu ${r.nama} (Warga ${r.alamat}), salam dari Pengurus ${this.data.settings.rtName}.`)}`;
+          const initials = r.nama.split(' ').map(n=>n[0]).join('').slice(0, 2);
+          const anggotaCount = r.jumlahAnggota || (r.familyMembers ? r.familyMembers.length : 1);
+
+          const card = document.createElement('div');
+          card.className = `resident-mobile-card ${isSelected ? 'selected' : ''}`;
+          card.id = `residentCard_${r.id}`;
+
+          card.innerHTML = `
+            <div class="res-card-top">
+              <div class="res-card-user">
+                <input type="checkbox" class="warga-row-checkbox pengurus-only" value="${r.id}" ${isSelected ? 'checked' : ''} onchange="App.toggleSelectWarga('${r.id}', this.checked)" title="Pilih warga ini" style="cursor: pointer; width: 18px; height: 18px; accent-color: #0f766e;">
+                <div class="res-card-avatar">${initials}</div>
+                <div class="res-card-title-group">
+                  <div class="res-card-name">${r.nama}</div>
+                  <div class="res-card-nik">NIK: ${r.nik || '-'}</div>
+                </div>
+              </div>
+              <span class="badge-status ${statusBadgeClass}">
+                ${r.statusHunian}
+              </span>
+            </div>
+
+            <div class="res-card-details">
+              <div class="res-detail-pill">
+                📍 <strong>${blockBadge}</strong>
+              </div>
+              <div class="res-detail-pill">
+                👨‍👩‍👧 <strong>${anggotaCount} Jiwa</strong>
+              </div>
+            </div>
+
+            <div class="res-card-actions-row">
+              <a href="${waLink}" target="_blank" class="btn-wa-fast" title="Hubungi via WhatsApp">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+                <span>${displayPhone}</span>
+              </a>
+
+              <div class="pwd-cell-box pengurus-only">
+                <span class="pwd-text-display" id="pwdDisplayCard_${r.id}" data-real-pwd="${(r.password || '123456').replace(/"/g, '&quot;')}">••••••</span>
+                <button type="button" class="btn-icon-action" style="padding: 2px 4px; width: 24px; height: 24px;" title="Lihat / Sembunyikan Password" onclick="App.toggleTablePassword('${r.id}')">
+                  <span id="pwdEyeCard_${r.id}" style="font-size: 12px;">👁️</span>
+                </button>
+                <button type="button" class="btn-icon-action" style="padding: 2px 4px; width: 24px; height: 24px; color: #0d9488;" title="Ubah / Reset Password Warga Ini" onclick="App.resetResidentPassword('${r.id}')">
+                  <span style="font-size: 12px;">🔑</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="res-card-footer pengurus-only">
+              <button type="button" class="btn-card-action btn-batch-teal" onclick="App.openAdminResidentDetail('${r.id}')" title="Lihat Dokumen KTP, KK & Anggota Keluarga">
+                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                <span>Dokumen</span>
+              </button>
+              <button type="button" class="btn-card-action btn-batch-blue" onclick="App.editResident('${r.id}')" title="Edit Data Warga">
+                <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                <span>Edit</span>
+              </button>
+              <button type="button" class="btn-card-action btn-batch-red" onclick="App.deleteResident('${r.id}')" title="Hapus Data Warga">
+                <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                <span>Hapus</span>
+              </button>
+            </div>
+          `;
+          cardsContainer.appendChild(card);
+        });
+      }
+    }
+
+    this.applyWargaViewMode();
     this.updateWargaBatchActionBar();
 
     this.renderWargaPagination(totalItems, totalPages, startIndex, endIndex);
     this.renderRoleUI();
+  },
+
+  setWargaViewMode(mode) {
+    AppState.wargaViewMode = mode;
+    try {
+      localStorage.setItem('rukunku_warga_view_mode', mode);
+    } catch (e) {}
+    this.applyWargaViewMode();
+  },
+
+  applyWargaViewMode() {
+    let mode = AppState.wargaViewMode;
+    if (!mode) {
+      try {
+        mode = localStorage.getItem('rukunku_warga_view_mode');
+      } catch (e) {}
+    }
+    if (!mode) {
+      mode = window.innerWidth <= 768 ? 'cards' : 'table';
+    }
+    AppState.wargaViewMode = mode;
+
+    const tableContainer = document.getElementById('wargaTableContainer');
+    const cardsContainer = document.getElementById('wargaCardsContainer');
+    const btnTable = document.getElementById('btnModeTable');
+    const btnCards = document.getElementById('btnModeCards');
+
+    if (mode === 'cards') {
+      if (tableContainer) tableContainer.style.display = 'none';
+      if (cardsContainer) cardsContainer.style.display = 'grid';
+      if (btnCards) btnCards.classList.add('active');
+      if (btnTable) btnTable.classList.remove('active');
+    } else {
+      if (tableContainer) tableContainer.style.display = 'block';
+      if (cardsContainer) cardsContainer.style.display = 'none';
+      if (btnTable) btnTable.classList.add('active');
+      if (btnCards) btnCards.classList.remove('active');
+    }
   },
 
   renderWargaPagination(totalItems, totalPages, startIndex, endIndex) {
@@ -2224,6 +2442,16 @@ const App = {
     if (row) {
       if (isChecked) row.classList.add('row-selected');
       else row.classList.remove('row-selected');
+      const cbRow = row.querySelector('.warga-row-checkbox');
+      if (cbRow) cbRow.checked = isChecked;
+    }
+
+    const card = document.getElementById(`residentCard_${residentId}`);
+    if (card) {
+      if (isChecked) card.classList.add('selected');
+      else card.classList.remove('selected');
+      const cbCard = card.querySelector('.warga-row-checkbox');
+      if (cbCard) cbCard.checked = isChecked;
     }
 
     // Check if all visible checkboxes on the current page are checked
@@ -2256,6 +2484,11 @@ const App = {
         if (isChecked) row.classList.add('row-selected');
         else row.classList.remove('row-selected');
       }
+      const card = document.getElementById(`residentCard_${resId}`);
+      if (card) {
+        if (isChecked) card.classList.add('selected');
+        else card.classList.remove('selected');
+      }
     });
     this.updateWargaBatchActionBar();
   },
@@ -2264,6 +2497,7 @@ const App = {
     AppState.selectedResidentIds = [];
     document.querySelectorAll('.warga-row-checkbox').forEach(cb => cb.checked = false);
     document.querySelectorAll('#residentsTableBody tr').forEach(tr => tr.classList.remove('row-selected'));
+    document.querySelectorAll('.resident-mobile-card').forEach(c => c.classList.remove('selected'));
     const checkAll = document.getElementById('checkAllWarga');
     if (checkAll) checkAll.checked = false;
     this.updateWargaBatchActionBar();
