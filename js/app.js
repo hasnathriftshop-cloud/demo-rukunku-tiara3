@@ -20,7 +20,8 @@ const AppState = {
   chartHighlightIndex: 8, // Day 9 (0-indexed)
   wargaPage: 1,
   wargaPageSize: 10,
-  chartPeriodMode: 'this_month'
+  chartPeriodMode: 'this_month',
+  selectedResidentIds: []
 };
 window.AppState = AppState;
 
@@ -2012,7 +2013,7 @@ const App = {
     if (pageItems.length === 0) {
       tableBody.innerHTML = `
         <tr>
-          <td colspan="8" style="text-align: center; padding: 32px 16px; color: #94a3b8;">
+          <td colspan="9" style="text-align: center; padding: 32px 16px; color: #94a3b8;">
             <div style="font-size: 26px; margin-bottom: 6px;">🔍</div>
             <div style="font-weight: 600; color: #475569;">Tidak ada data warga ditemukan.</div>
             <div style="font-size: 12px; margin-top: 4px;">Coba ubah kata kunci pencarian atau filter blok.</div>
@@ -2023,6 +2024,10 @@ const App = {
       pageItems.forEach((r, idx) => {
         const rowNumber = startIndex + idx + 1;
         const tr = document.createElement('tr');
+        const isSelected = (AppState.selectedResidentIds || []).includes(r.id);
+        if (isSelected) tr.classList.add('row-selected');
+        tr.id = `residentRow_${r.id}`;
+
         const waLink = `https://wa.me/${r.phone}?text=${encodeURIComponent(`Halo Bpk/Ibu ${r.nama} (Warga ${r.alamat}), salam dari Pengurus ${this.data.settings.rtName}.`)}`;
 
         const blockBadge = `${r.blok} No. ${r.noRumah}`;
@@ -2045,6 +2050,9 @@ const App = {
         const displayPhone = rawPhone.startsWith('62') ? ('0' + rawPhone.slice(2)) : rawPhone;
 
         tr.innerHTML = `
+          <td class="pengurus-only" style="text-align: center; vertical-align: middle;">
+            <input type="checkbox" class="warga-row-checkbox" value="${r.id}" ${isSelected ? 'checked' : ''} onchange="App.toggleSelectWarga('${r.id}', this.checked)" title="Pilih warga ini" style="cursor: pointer; width: 16px; height: 16px; accent-color: #0f766e;">
+          </td>
           <td style="text-align: center; color: var(--text-muted); font-weight: 600;">${rowNumber}</td>
           <td>
             <div class="table-resident-name">
@@ -2086,7 +2094,7 @@ const App = {
               </button>
             </div>
           </td>
-          <td class="pengurus-only">
+          <td class="pengurus-only" style="text-align: center; white-space: nowrap; min-width: 140px; width: 140px;">
             <div class="table-actions">
               <button class="btn-action-round btn-action-teal" title="Lihat Dokumen KTP, KK & Anggota Keluarga" onclick="App.openAdminResidentDetail('${r.id}')">
                 <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -2104,6 +2112,13 @@ const App = {
         tableBody.appendChild(tr);
       });
     }
+
+    // Check header checkbox state
+    const checkAll = document.getElementById('checkAllWarga');
+    if (checkAll && pageItems.length > 0) {
+      checkAll.checked = pageItems.every(item => (AppState.selectedResidentIds || []).includes(item.id));
+    }
+    this.updateWargaBatchActionBar();
 
     this.renderWargaPagination(totalItems, totalPages, startIndex, endIndex);
     this.renderRoleUI();
@@ -2198,6 +2213,158 @@ const App = {
     AppState.wargaPageSize = parseInt(size, 10) || 10;
     AppState.wargaPage = 1;
     this.renderResidents(1);
+  },
+
+  // =========================================================================
+  // Batch Selection Handler (Checkbox Warga & Top Action Bar)
+  // =========================================================================
+  toggleSelectWarga(residentId, isChecked) {
+    if (!Array.isArray(AppState.selectedResidentIds)) {
+      AppState.selectedResidentIds = [];
+    }
+    if (isChecked) {
+      if (!AppState.selectedResidentIds.includes(residentId)) {
+        AppState.selectedResidentIds.push(residentId);
+      }
+    } else {
+      AppState.selectedResidentIds = AppState.selectedResidentIds.filter(id => id !== residentId);
+    }
+
+    const row = document.getElementById(`residentRow_${residentId}`);
+    if (row) {
+      if (isChecked) row.classList.add('row-selected');
+      else row.classList.remove('row-selected');
+    }
+
+    // Check if all visible checkboxes on the current page are checked
+    const allVisible = document.querySelectorAll('.warga-row-checkbox');
+    const checkAll = document.getElementById('checkAllWarga');
+    if (checkAll && allVisible.length > 0) {
+      checkAll.checked = Array.from(allVisible).every(cb => cb.checked);
+    }
+
+    this.updateWargaBatchActionBar();
+  },
+
+  toggleSelectAllWarga(isChecked) {
+    if (!Array.isArray(AppState.selectedResidentIds)) {
+      AppState.selectedResidentIds = [];
+    }
+    const checkboxes = document.querySelectorAll('.warga-row-checkbox');
+    checkboxes.forEach(cb => {
+      cb.checked = isChecked;
+      const resId = cb.value;
+      if (isChecked) {
+        if (!AppState.selectedResidentIds.includes(resId)) {
+          AppState.selectedResidentIds.push(resId);
+        }
+      } else {
+        AppState.selectedResidentIds = AppState.selectedResidentIds.filter(id => id !== resId);
+      }
+      const row = document.getElementById(`residentRow_${resId}`);
+      if (row) {
+        if (isChecked) row.classList.add('row-selected');
+        else row.classList.remove('row-selected');
+      }
+    });
+    this.updateWargaBatchActionBar();
+  },
+
+  clearWargaSelection() {
+    AppState.selectedResidentIds = [];
+    document.querySelectorAll('.warga-row-checkbox').forEach(cb => cb.checked = false);
+    document.querySelectorAll('#residentsTableBody tr').forEach(tr => tr.classList.remove('row-selected'));
+    const checkAll = document.getElementById('checkAllWarga');
+    if (checkAll) checkAll.checked = false;
+    this.updateWargaBatchActionBar();
+  },
+
+  updateWargaBatchActionBar() {
+    const bar = document.getElementById('wargaBatchActionBar');
+    if (!bar) return;
+
+    const count = (AppState.selectedResidentIds || []).length;
+    if (count === 0) {
+      bar.style.display = 'none';
+      const checkAll = document.getElementById('checkAllWarga');
+      if (checkAll) checkAll.checked = false;
+      return;
+    }
+
+    bar.style.display = 'flex';
+    const countEl = document.getElementById('wargaSelectedCount');
+    const nameEl = document.getElementById('wargaSelectedName');
+    const btnDetail = document.getElementById('btnBatchDetail');
+    const btnEdit = document.getElementById('btnBatchEdit');
+    const btnDelete = document.getElementById('btnBatchDelete');
+
+    if (countEl) countEl.textContent = `${count} Terpilih`;
+
+    if (count === 1) {
+      const singleId = AppState.selectedResidentIds[0];
+      const res = (this.data.residents || []).find(r => r.id === singleId);
+      if (nameEl) nameEl.textContent = res ? `Bpk/Ibu ${res.nama} (${res.blok} No. ${res.noRumah})` : '';
+      if (btnDetail) btnDetail.style.display = 'inline-flex';
+      if (btnEdit) btnEdit.style.display = 'inline-flex';
+      if (btnDelete) btnDelete.innerHTML = `
+        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        <span>Hapus Data</span>
+      `;
+    } else {
+      if (nameEl) nameEl.textContent = `${count} kepala keluarga dipilih`;
+      if (btnDetail) btnDetail.style.display = 'none';
+      if (btnEdit) btnEdit.style.display = 'none';
+      if (btnDelete) btnDelete.innerHTML = `
+        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        <span>Hapus (${count}) Warga</span>
+      `;
+    }
+  },
+
+  openSelectedResidentDetail() {
+    if (!AppState.selectedResidentIds || AppState.selectedResidentIds.length === 0) return;
+    this.openAdminResidentDetail(AppState.selectedResidentIds[0]);
+  },
+
+  editSelectedResident() {
+    if (!AppState.selectedResidentIds || AppState.selectedResidentIds.length === 0) return;
+    this.editResident(AppState.selectedResidentIds[0]);
+  },
+
+  deleteSelectedResidents() {
+    const ids = AppState.selectedResidentIds || [];
+    if (ids.length === 0) return;
+
+    if (ids.length === 1) {
+      this.deleteResident(ids[0]);
+      this.clearWargaSelection();
+      return;
+    }
+
+    if (confirm(`Yakin ingin menghapus ${ids.length} data warga yang telah dipilih sekaligus?`)) {
+      this.data.residents = (this.data.residents || []).filter(r => !ids.includes(r.id));
+      if (this.data.duesMatrix) {
+        ids.forEach(id => {
+          delete this.data.duesMatrix[id];
+          Object.keys(this.data.duesMatrix).forEach(key => {
+            if (this.data.duesMatrix[key] && typeof this.data.duesMatrix[key] === 'object' && this.data.duesMatrix[key][id]) {
+              delete this.data.duesMatrix[key][id];
+            }
+          });
+        });
+      }
+      DB.save(this.data);
+
+      if (window.CloudSync && typeof window.CloudSync.deleteResidentDirect === 'function') {
+        ids.forEach(id => window.CloudSync.deleteResidentDirect(id));
+      }
+
+      this.clearWargaSelection();
+      this.renderResidents();
+      this.renderDuesMatrix();
+      this.renderDashboard();
+      alert(`${ids.length} data warga berhasil dihapus.`);
+    }
   },
 
   openAddResidentModal() {
@@ -4821,6 +4988,21 @@ const App = {
           `).join('')}
         </div>
       `;
+    }
+
+    const btnEdit = document.getElementById('btnModalDetailEditResident');
+    const btnDel = document.getElementById('btnModalDetailDeleteResident');
+    if (btnEdit) {
+      btnEdit.onclick = () => {
+        this.closeModal('modalDetailWargaAdmin');
+        this.editResident(residentId);
+      };
+    }
+    if (btnDel) {
+      btnDel.onclick = () => {
+        this.closeModal('modalDetailWargaAdmin');
+        this.deleteResident(residentId);
+      };
     }
 
     this.openModal('modalDetailWargaAdmin');
