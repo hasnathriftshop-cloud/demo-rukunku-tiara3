@@ -101,12 +101,20 @@ function doPost(e) {
       });
     }
 
-    // 2. Tambah / Edit Transaksi Kas
+    // 2. Tambah / Edit Transaksi Kas (Langsung & Aman dengan Google Drive untuk Bukti Transfer)
     if (action === 'addTransaction' && payload.transaction) {
+      let buktiTransferUrl = payload.transaction.buktiTransfer || payload.transaction.buktiFoto || '';
+      if (buktiTransferUrl && buktiTransferUrl.startsWith('data:image/')) {
+        const cleanJudul = (payload.transaction.judul || 'tx').replace(/[^a-zA-Z0-9]/g, '_');
+        buktiTransferUrl = uploadBase64ToDrive(buktiTransferUrl, 'Bukti_Transfer_' + cleanJudul + '_' + (payload.transaction.id || Date.now()), 'Bukti Transfer Iuran');
+        payload.transaction.buktiTransfer = buktiTransferUrl;
+        payload.transaction.buktiFoto = buktiTransferUrl;
+      }
       addTransactionRow(payload.transaction);
       return jsonResponse({
         status: 'success',
-        message: 'Transaksi kas berhasil dicatat di Google Sheets.'
+        message: 'Transaksi kas berhasil dicatat di Google Sheets & Google Drive.',
+        transaction: payload.transaction
       });
     }
 
@@ -174,6 +182,18 @@ function doPost(e) {
       });
     }
 
+    // 10. Upload Berkas Bebas ke Google Drive (Bukti Transfer / Dokumen Warga)
+    if (action === 'uploadFile' && payload.fileData) {
+      const cleanName = (payload.fileName || ('File_' + Date.now())).replace(/[^a-zA-Z0-9]/g, '_');
+      const folderName = payload.folderName || 'Bukti Transfer Iuran';
+      const fileUrl = uploadBase64ToDrive(payload.fileData, cleanName, folderName);
+      return jsonResponse({
+        status: 'success',
+        url: fileUrl,
+        message: 'Berkas berhasil diunggah ke Google Drive.'
+      });
+    }
+
     return jsonResponse({
       status: 'error',
       message: 'Aksi POST tidak valid: ' + action
@@ -232,7 +252,7 @@ function getHeadersForSheet(name) {
   if (name === SHEET_NAMES.WARGA) {
     return ['ID', 'Nama Kepala Keluarga', 'NIK', 'No KK', 'Blok', 'No Rumah', 'Alamat', 'No WhatsApp', 'Jumlah Jiwa', 'Status Hunian', 'Pekerjaan', 'Status Aktif', 'Tanggal Masuk', 'Avatar Bg', 'Password', 'Anggota Keluarga (JSON)', 'Foto KK (URL Drive)'];
   } else if (name === SHEET_NAMES.TRANSAKSI) {
-    return ['ID Transaksi', 'Tanggal', 'Waktu', 'Jenis', 'Kategori', 'Judul Transaksi', 'Keterangan', 'ID Warga', 'Blok / Alamat', 'Nominal (Rp)', 'Metode Bayar', 'Status', 'No Kwitansi', 'Pencatat'];
+    return ['ID Transaksi', 'Tanggal', 'Waktu', 'Jenis', 'Kategori', 'Judul Transaksi', 'Keterangan', 'ID Warga', 'Blok / Alamat', 'Nominal (Rp)', 'Metode Bayar', 'Status', 'No Kwitansi', 'Pencatat', 'Bukti Transfer (URL Drive)'];
   } else if (name === SHEET_NAMES.IURAN) {
     return ['ID Warga', 'Nama KK', 'Blok/Rumah', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
   } else if (name === SHEET_NAMES.TALANGAN) {
@@ -335,7 +355,7 @@ function fetchAllDataFromSheets() {
         if (row[15]) {
           try { familyMembers = JSON.parse(row[15]); } catch(e) {}
         }
-        if (!familyMembers || familyMembers.length === 0) {
+        if (!familyMembers || !Array.isArray(familyMembers) || familyMembers.length === 0) {
           familyMembers = [
             {
               id: `${id}-fm-1`,
@@ -350,6 +370,9 @@ function fetchAllDataFromSheets() {
           ];
         }
 
+        const rawJumlah = parseInt(row[8], 10);
+        const finalJumlah = Math.max(isNaN(rawJumlah) ? 1 : rawJumlah, (familyMembers ? familyMembers.length : 1));
+
         residents.push({
           id: id,
           nama: nama,
@@ -359,7 +382,7 @@ function fetchAllDataFromSheets() {
           noRumah: String(row[5] || '').trim(),
           alamat: String(row[6] || '').trim(),
           phone: String(row[7] || '').replace(/^'/, '').trim(),
-          jumlahAnggota: familyMembers.length || Number(row[8] || 1),
+          jumlahAnggota: finalJumlah,
           statusHunian: String(row[9] || 'Pemilik Tetap'),
           pekerjaan: String(row[10] || ''),
           statusAktif: row[11] === true || String(row[11]).toLowerCase() === 'true',
@@ -377,7 +400,8 @@ function fetchAllDataFromSheets() {
   const txSheet = activeSS.getSheetByName(SHEET_NAMES.TRANSAKSI);
   const transactions = [];
   if (txSheet && txSheet.getLastRow() > 1) {
-    const tRows = txSheet.getRange(2, 1, txSheet.getLastRow() - 1, 14).getValues();
+    const maxCols = Math.max(15, txSheet.getLastColumn());
+    const tRows = txSheet.getRange(2, 1, txSheet.getLastRow() - 1, maxCols).getValues();
     tRows.forEach(row => {
       if (row[0]) {
         transactions.push({
@@ -394,7 +418,8 @@ function fetchAllDataFromSheets() {
           metode: String(row[10] || 'Kas Tunai'),
           status: String(row[11] || 'Approved'),
           kwitansi: String(row[12] || ''),
-          pencatat: String(row[13] || '')
+          pencatat: String(row[13] || ''),
+          buktiTransfer: String(row[14] || '').trim()
         });
       }
     });
@@ -567,7 +592,7 @@ function saveAllDataToSheets(data) {
             r.noRumah || '',
             r.alamat || '',
             "'" + (r.phone || ''),
-            r.jumlahAnggota || (r.familyMembers ? r.familyMembers.length : 1),
+            Math.max(Number(r.jumlahAnggota) || 1, (r.familyMembers ? r.familyMembers.length : 1)),
             r.statusHunian || 'Pemilik Tetap',
             r.pekerjaan || '',
             r.statusAktif !== false,
@@ -599,7 +624,8 @@ function saveAllDataToSheets(data) {
       
       const txMap = new Map();
       if (sheet.getLastRow() > 1) {
-        const existingTx = sheet.getRange(2, 1, sheet.getLastRow() - 1, 14).getValues();
+        const maxCols = Math.max(15, sheet.getLastColumn());
+        const existingTx = sheet.getRange(2, 1, sheet.getLastRow() - 1, maxCols).getValues();
         existingTx.forEach(row => {
           const id = String(row[0] || '').trim();
           if (id) txMap.set(id, row);
@@ -609,6 +635,14 @@ function saveAllDataToSheets(data) {
       data.transactions.forEach(t => {
         const id = String(t.id || '').trim();
         if (id) {
+          let buktiTransferUrl = t.buktiTransfer || t.buktiFoto || '';
+          if (buktiTransferUrl && buktiTransferUrl.startsWith('data:image/')) {
+            const cleanJudul = (t.judul || 'tx').replace(/[^a-zA-Z0-9]/g, '_');
+            buktiTransferUrl = uploadBase64ToDrive(buktiTransferUrl, 'Bukti_Transfer_' + cleanJudul + '_' + id, 'Bukti Transfer Iuran');
+            t.buktiTransfer = buktiTransferUrl;
+            t.buktiFoto = buktiTransferUrl;
+          }
+
           const row = [
             id,
             t.tanggal || '',
@@ -623,7 +657,8 @@ function saveAllDataToSheets(data) {
             t.metode || 'Kas Tunai',
             t.status || 'Approved',
             t.kwitansi || '',
-            t.pencatat || ''
+            t.pencatat || '',
+            buktiTransferUrl || ''
           ];
           txMap.set(id, row);
         }
@@ -632,9 +667,9 @@ function saveAllDataToSheets(data) {
       const combinedTx = Array.from(txMap.values());
       if (combinedTx.length > 0) {
         if (sheet.getLastRow() > 1) {
-          sheet.getRange(2, 1, sheet.getLastRow() - 1, 14).clearContent();
+          sheet.getRange(2, 1, sheet.getLastRow() - 1, 15).clearContent();
         }
-        sheet.getRange(2, 1, combinedTx.length, 14).setValues(combinedTx);
+        sheet.getRange(2, 1, combinedTx.length, 15).setValues(combinedTx);
       }
     }
   }
@@ -774,14 +809,15 @@ function saveAllDataToSheets(data) {
 }
 
 /**
- * Tambah baris transaksi kas langsung ke Google Sheets
+ * Tambah / Update baris transaksi kas langsung ke Google Sheets (Upsert)
  */
 function addTransactionRow(tx) {
   const activeSS = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = activeSS.getSheetByName(SHEET_NAMES.TRANSAKSI);
   if (!sheet) return;
   ensureSheetHeadersOnly(sheet, SHEET_NAMES.TRANSAKSI);
-  sheet.appendRow([
+
+  const rowData = [
     tx.id,
     tx.tanggal || '',
     tx.waktu || '10:00',
@@ -795,8 +831,27 @@ function addTransactionRow(tx) {
     tx.metode || 'Kas Tunai',
     tx.status || 'Approved',
     tx.kwitansi || '',
-    tx.pencatat || ''
-  ]);
+    tx.pencatat || '',
+    tx.buktiTransfer || tx.buktiFoto || ''
+  ];
+
+  const lastRow = sheet.getLastRow();
+  let foundRow = -1;
+  if (lastRow > 1) {
+    const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    for (let i = 0; i < ids.length; i++) {
+      if (String(ids[i][0]).trim() === String(tx.id).trim()) {
+        foundRow = i + 2;
+        break;
+      }
+    }
+  }
+
+  if (foundRow > 1) {
+    sheet.getRange(foundRow, 1, 1, rowData.length).setValues([rowData]);
+  } else {
+    sheet.appendRow(rowData);
+  }
 }
 
 /**
@@ -848,7 +903,7 @@ function upsertResidentRow(resident) {
     resident.noRumah || '',
     resident.alamat || '',
     "'" + (resident.phone || ''),
-    resident.jumlahAnggota || (resident.familyMembers ? resident.familyMembers.length : 1),
+    Math.max(Number(resident.jumlahAnggota) || 1, (resident.familyMembers ? resident.familyMembers.length : 1)),
     resident.statusHunian || 'Pemilik Tetap',
     resident.pekerjaan || '',
     resident.statusAktif !== false,
@@ -1077,6 +1132,7 @@ function initializeAllSheets() {
     getOrCreateSubFolder(mainFolder, "Kartu Keluarga");
     getOrCreateSubFolder(mainFolder, "Foto KTP");
     getOrCreateSubFolder(mainFolder, "Bukti Setoran Kas");
+    getOrCreateSubFolder(mainFolder, "Bukti Transfer Iuran");
   } catch(e) {
     Logger.log("Peringatan Drive: " + e);
   }
@@ -1091,6 +1147,7 @@ function testDriveAuthorization() {
   getOrCreateSubFolder(mainFolder, "Kartu Keluarga");
   getOrCreateSubFolder(mainFolder, "Foto KTP");
   getOrCreateSubFolder(mainFolder, "Bukti Setoran Kas");
+  getOrCreateSubFolder(mainFolder, "Bukti Transfer Iuran");
   Logger.log("✅ Otorisasi Google Drive Aktif! Folder: " + mainFolder.getName());
   return "Otorisasi Google Drive Berhasil!";
 }
