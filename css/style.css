@@ -1343,37 +1343,43 @@ body::after {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
 }
 
-.app-table {
+.app-table,
+.data-table {
   width: 100%;
   border-collapse: collapse;
   text-align: left;
 }
 
-.app-table th {
+.app-table th,
+.data-table th {
   background: #f8fafc;
-  padding: 14px 18px;
-  font-size: 12px;
+  padding: 13px 16px;
+  font-size: 11.5px;
   font-weight: 700;
-  color: var(--text-muted);
+  color: #64748b;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap;
 }
 
-.app-table td {
-  padding: 14px 18px;
+.app-table td,
+.data-table td {
+  padding: 13px 16px;
   font-size: 13px;
-  color: var(--text-main);
+  color: #1e293b;
   border-bottom: 1px solid #f1f5f9;
   vertical-align: middle;
 }
 
-.app-table tr:last-child td {
+.app-table tr:last-child td,
+.data-table tr:last-child td {
   border-bottom: none;
 }
 
-.app-table tr:hover td {
-  background: #fbfdfd;
+.app-table tr:hover td,
+.data-table tr:hover td {
+  background: #f8fbfb;
 }
 
 .table-resident-name {
@@ -1381,16 +1387,19 @@ body::after {
   color: #111827;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .badge-block {
-  background: #e2e8f0;
-  color: #475569;
+  background: #f1f5f9;
+  color: #334155;
+  border: 1px solid #e2e8f0;
   font-size: 11px;
   font-weight: 700;
-  padding: 2px 7px;
-  border-radius: 8px;
+  padding: 2.5px 8px;
+  border-radius: 6px;
+  display: inline-block;
+  white-space: nowrap;
 }
 
 .table-actions {
@@ -1423,12 +1432,106 @@ body::after {
   color: #15803d;
   background: #f0fdf4;
   border-color: #bbf7d0;
+  width: auto;
+  padding: 4px 10px;
 }
 
 .btn-icon-wa:hover {
-  background: #22c55e;
+  background: #16a34a;
   color: #ffffff;
-  border-color: #22c55e;
+  border-color: #16a34a;
+}
+
+/* WhatsApp Table Pill Link - Sleek & Full Width of content */
+.btn-table-wa {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.18s ease-in-out;
+  white-space: nowrap;
+}
+
+.btn-table-wa:hover {
+  background: #16a34a !important;
+  color: #ffffff !important;
+  border-color: #16a34a !important;
+  box-shadow: 0 2px 6px rgba(22, 163, 74, 0.25);
+  transform: translateY(-1px);
+}
+
+.btn-table-wa:hover svg {
+  stroke: #ffffff;
+}
+
+/* Round Action Buttons for Tables */
+.btn-action-round {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  background: #f8fafc;
+}
+
+.btn-action-round:hover {
+  transform: translateY(-1.5px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.btn-action-teal {
+  color: #0f766e;
+  background: #f0fdfa;
+  border-color: #ccfbf1;
+}
+.btn-action-teal:hover {
+  background: #0d9488;
+  color: #ffffff;
+  border-color: #0d9488;
+}
+
+.btn-action-blue {
+  color: #0284c7;
+  background: #f0f9ff;
+  border-color: #bae6fd;
+}
+.btn-action-blue:hover {
+  background: #0284c7;
+  color: #ffffff;
+  border-color: #0284c7;
+}
+
+.btn-action-red {
+  color: #e11d48;
+  background: #fff1f2;
+  border-color: #fecdd3;
+}
+.btn-action-red:hover {
+  background: #e11d48;
+  color: #ffffff;
+  border-color: #e11d48;
+}
+
+/* Badge Kos */
+.badge-kos {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 12px;
 }
 
 /* Dues Matrix Table */
