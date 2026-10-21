@@ -546,20 +546,64 @@ const CloudSync = {
     return false;
   },
 
-  // Tambah transaksi kas masuk / keluar langsung ke Google Sheets (sheet Transaksi)
+  // Upload file bebas atau foto bukti transfer langsung ke Google Drive
+  async uploadFileToDrive(base64Data, fileName, folderName = 'Bukti Transfer Iuran') {
+    const gasUrl = this.getGasUrl();
+    if (!gasUrl || !base64Data) return null;
+    try {
+      this.status = 'syncing';
+      this.updateStatusUI();
+      const res = await fetch(gasUrl, {
+        method: 'POST',
+        mode: 'cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'uploadFile',
+          fileData: base64Data,
+          fileName: fileName,
+          folderName: folderName
+        })
+      });
+      const json = await res.json();
+      this.status = 'connected';
+      this.updateStatusUI();
+      if (json && json.status === 'success' && json.url) {
+        return json.url;
+      }
+    } catch (err) {
+      console.warn("Direct upload to Google Drive failed:", err);
+      this.status = 'error';
+      this.updateStatusUI();
+    }
+    return null;
+  },
+
+  // Tambah / Update transaksi kas masuk / keluar langsung ke Google Sheets & Google Drive
   async saveTransactionDirect(transaction) {
     const gasUrl = this.getGasUrl();
     if (!gasUrl || !transaction) return false;
     try {
-      await fetch(gasUrl, {
+      this.status = 'syncing';
+      this.updateStatusUI();
+      const res = await fetch(gasUrl, {
         method: 'POST',
         mode: 'cors',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({ action: 'addTransaction', transaction })
       });
+      const json = await res.json();
+      this.status = 'connected';
+      this.lastSyncTime = new Date().toISOString();
+      localStorage.setItem(this.STORAGE_KEY_LAST_SYNC, this.lastSyncTime);
+      this.updateStatusUI();
+      if (json && json.status === 'success') {
+        return json.transaction || true;
+      }
       return true;
     } catch (err) {
       console.warn("Direct save transaction failed:", err);
+      this.status = 'error';
+      this.updateStatusUI();
       return false;
     }
   },
