@@ -219,6 +219,13 @@ const App = {
         if (role) this.selectAuthRole(role);
       });
     });
+
+    // Cegah scroll mouse mengubah angka pada input type number secara tidak sengaja
+    document.addEventListener('wheel', (e) => {
+      if (document.activeElement && document.activeElement.type === 'number') {
+        document.activeElement.blur();
+      }
+    }, { passive: true });
   },
 
   // Switch Active View / Tab
@@ -1902,7 +1909,7 @@ const App = {
             ${r.statusHunian}
           </span>
         </td>
-        <td style="text-align: center;"><strong>${r.jumlahAnggota}</strong> Jiwa</td>
+        <td style="text-align: center;"><strong>${r.jumlahAnggota || (r.familyMembers ? r.familyMembers.length : 1)}</strong> Jiwa</td>
         <td>
           <a href="${waLink}" target="_blank" class="btn-icon-action btn-icon-wa" title="Kirim Pesan WhatsApp">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
@@ -1982,10 +1989,24 @@ const App = {
         target.noRumah = noRumah;
         target.alamat = `${blok} No. ${noRumah}`;
         target.phone = phone.startsWith('0') ? '62' + phone.slice(1) : phone;
-        target.jumlahAnggota = jumlahAnggota;
+        target.jumlahAnggota = Math.max(jumlahAnggota, (target.familyMembers ? target.familyMembers.length : 1));
         target.statusHunian = statusHunian;
         target.pekerjaan = pekerjaan;
         target.password = password;
+        if (!target.familyMembers || target.familyMembers.length === 0) {
+          target.familyMembers = [
+            {
+              id: `${target.id}-fm-1`,
+              nama: nama,
+              hubungan: 'Kepala Keluarga',
+              nik: nik || '',
+              jenisKelamin: 'Laki-laki',
+              tanggalLahir: '',
+              punyaKtp: !!nik,
+              fotoKtp: ''
+            }
+          ];
+        }
         savedResident = target;
       }
     } else {
@@ -2008,13 +2029,25 @@ const App = {
         noRumah,
         alamat: `${blok} No. ${noRumah}`,
         phone: phone.startsWith('0') ? '62' + phone.slice(1) : phone,
-        jumlahAnggota,
+        jumlahAnggota: Math.max(jumlahAnggota, 1),
         statusHunian,
         pekerjaan,
         password: password,
         statusAktif: true,
         tanggalMasuk: new Date().toISOString().slice(0, 10),
-        avatarBg: 'bg-pastel-teal'
+        avatarBg: 'bg-pastel-teal',
+        familyMembers: [
+          {
+            id: `${newId}-fm-1`,
+            nama: nama,
+            hubungan: 'Kepala Keluarga',
+            nik: nik || '',
+            jenisKelamin: 'Laki-laki',
+            tanggalLahir: '',
+            punyaKtp: !!nik,
+            fotoKtp: ''
+          }
+        ]
       };
 
       this.data.residents.push(newResident);
@@ -3975,7 +4008,7 @@ const App = {
           fotoKtp: ''
         }
       ];
-      resident.jumlahAnggota = resident.familyMembers.length;
+      resident.jumlahAnggota = Math.max(resident.jumlahAnggota || 1, resident.familyMembers.length);
     }
 
     const members = resident.familyMembers;
@@ -4355,7 +4388,7 @@ const App = {
     }
 
     // Update jumlah anggota otomatis
-    resident.jumlahAnggota = resident.familyMembers.length;
+    resident.jumlahAnggota = Math.max(resident.jumlahAnggota || 1, resident.familyMembers.length);
 
     DB.save(this.data);
     this.closeModal('modalAnggotaKeluarga');
@@ -4421,6 +4454,8 @@ const App = {
         }
       ];
 
+      const totalJiwa = Math.max(Number(resident.jumlahAnggota) || 1, members.length);
+
       container.innerHTML = `
         <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px; margin-bottom: 16px;">
           <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
@@ -4430,7 +4465,7 @@ const App = {
               <div style="font-size: 12px; color: #64748b; margin-top: 2px;">No. KK: <strong>${resident.noKk || 'Belum diisi'}</strong> • Status: <strong>${resident.statusHunian}</strong></div>
             </div>
             <div>
-              <span class="badge-block" style="font-size: 12px; padding: 6px 12px;">Total: ${members.length} Jiwa</span>
+              <span class="badge-block" style="font-size: 12px; padding: 6px 12px;">Total: ${totalJiwa} Jiwa</span>
             </div>
           </div>
 
@@ -4453,7 +4488,7 @@ const App = {
         </div>
 
         <div style="font-size: 13px; font-weight: 800; color: #1e293b; margin-bottom: 10px;">
-          Daftar Anggota Keluarga yang Tinggal Bersama (${members.length} Jiwa):
+          Daftar Anggota Keluarga yang Tinggal Bersama (${totalJiwa} Jiwa):
         </div>
 
         <div style="display: flex; flex-direction: column; gap: 8px;">
