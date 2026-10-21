@@ -19,7 +19,8 @@ const AppState = {
   wargaSelectedYear: new Date().getFullYear(),
   chartHighlightIndex: 8, // Day 9 (0-indexed)
   wargaPage: 1,
-  wargaPageSize: 10
+  wargaPageSize: 10,
+  chartPeriodMode: 'this_month'
 };
 window.AppState = AppState;
 
@@ -1576,22 +1577,128 @@ const App = {
   },
 
   // =========================================================================
-  // Chart Rendering (14 Bars Matching Mockup)
+  // Chart Rendering (Real Dynamic Transactions from DB)
   // =========================================================================
+  onChartPeriodChange(val) {
+    AppState.chartPeriodMode = val;
+    AppState.chartHighlightIndex = null;
+    this.renderChart();
+  },
+
   renderChart() {
     const chartBarsContainer = document.getElementById('chartBarsArea');
     const xAxisContainer = document.getElementById('xAxisArea');
+    const yAxisContainer = document.querySelector('.y-axis-labels');
     if (!chartBarsContainer || !xAxisContainer) return;
 
     chartBarsContainer.innerHTML = '';
     xAxisContainer.innerHTML = '';
 
-    const dailyData = this.data.dailyFlowOctober;
-    const maxVal = Math.max(...dailyData.map(d => d.amountIn), 3000000);
+    const periodMode = AppState.chartPeriodMode || 'this_month';
+    const curYear = AppState.selectedYear || new Date().getFullYear();
+    const curMonth = AppState.selectedMonth || (new Date().getMonth() + 1);
+    const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+    const transactions = this.data.transactions || [];
 
-    dailyData.forEach((item, idx) => {
-      const heightPercent = Math.max(15, Math.round((item.amountIn / maxVal) * 90));
+    // Populate period dropdown options dynamically
+    const periodSelect = document.getElementById('chartPeriodSelect');
+    if (periodSelect && periodSelect.options.length === 0) {
+      periodSelect.innerHTML = `
+        <option value="this_month">📅 Bulan Ini (${monthNames[curMonth - 1]} ${curYear})</option>
+        <option value="last_month">📅 Bulan Lalu (${curMonth > 1 ? monthNames[curMonth - 2] : monthNames[11]} ${curMonth > 1 ? curYear : curYear - 1})</option>
+        <option value="yearly">📊 Tren Bulanan ${curYear} (Jan - Des)</option>
+      `;
+      periodSelect.value = periodMode;
+    }
+
+    let chartItems = [];
+    const todayDate = new Date();
+    const isCurMonthAndYear = (todayDate.getFullYear() === curYear && (todayDate.getMonth() + 1) === curMonth);
+    const todayDay = todayDate.getDate();
+
+    if (periodMode === 'yearly') {
+      const shortMonths = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+      shortMonths.forEach((mName, idx) => {
+        const m = idx + 1;
+        const txsInMonth = transactions.filter(t => {
+          if (t.tipe !== 'masuk' || t.status === 'Batal' || t.status === 'Pending') return false;
+          if (!t.tanggal) return false;
+          const d = new Date(t.tanggal);
+          return d.getFullYear() === curYear && (d.getMonth() + 1) === m;
+        });
+        const sum = txsInMonth.reduce((acc, t) => acc + Number(t.nominal || 0), 0);
+        chartItems.push({
+          key: m,
+          label: mName,
+          sub: `${mName} ${curYear}`,
+          amountIn: sum,
+          isToday: (m === curMonth)
+        });
+      });
+    } else {
+      // Monthly view (this_month or last_month)
+      const targetMonth = periodMode === 'last_month' ? (curMonth > 1 ? curMonth - 1 : 12) : curMonth;
+      const targetYear = periodMode === 'last_month' && curMonth === 1 ? curYear - 1 : curYear;
+      const daysInMonth = new Date(targetYear, targetMonth, 0).getDate();
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dayStr = `${targetYear}-${String(targetMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const txsDay = transactions.filter(t => {
+          if (t.tipe !== 'masuk' || t.status === 'Batal' || t.status === 'Pending') return false;
+          return (t.tanggal || '').startsWith(dayStr);
+        });
+        const sum = txsDay.reduce((acc, t) => acc + Number(t.nominal || 0), 0);
+        const isToday = isCurMonthAndYear && (day === todayDay) && (targetMonth === curMonth);
+        chartItems.push({
+          key: day,
+          label: String(day),
+          sub: `${day} ${monthNames[targetMonth - 1]}`,
+          amountIn: sum,
+          isToday: isToday
+        });
+      }
+    }
+
+    // Determine highlight index (default to today or latest day)
+    if (typeof AppState.chartHighlightIndex !== 'number' || AppState.chartHighlightIndex === null || AppState.chartHighlightIndex >= chartItems.length) {
+      const todayIdx = chartItems.findIndex(item => item.isToday);
+      if (todayIdx !== -1) {
+        AppState.chartHighlightIndex = todayIdx;
+      } else {
+        // Find highest transaction day or default to last day
+        let maxIdx = 0;
+        let maxVal = -1;
+        chartItems.forEach((item, i) => {
+          if (item.amountIn > maxVal) {
+            maxVal = item.amountIn;
+            maxIdx = i;
+          }
+        });
+        AppState.chartHighlightIndex = maxVal > 0 ? maxIdx : (chartItems.length - 1);
+      }
+    }
+
+    // Calculate Max Value for scale
+    const rawMax = Math.max(...chartItems.map(d => d.amountIn), 0);
+    // If no transactions, default ceiling is Rp 500.000 so scale looks natural and not empty
+    const maxVal = rawMax > 0 ? Math.ceil(rawMax / 100000) * 100000 : 500000;
+
+    // Update Y-Axis scale labels dynamically
+    if (yAxisContainer) {
+      yAxisContainer.innerHTML = `
+        <div>${Utils.formatRupiah(maxVal)}</div>
+        <div>${Utils.formatRupiah(Math.round(maxVal * 0.66))}</div>
+        <div>${Utils.formatRupiah(Math.round(maxVal * 0.33))}</div>
+        <div>Rp 0</div>
+      `;
+    }
+
+    // Render Bars
+    chartItems.forEach((item, idx) => {
       const isHighlighted = idx === AppState.chartHighlightIndex;
+      const heightPercent = item.amountIn > 0 
+        ? Math.max(10, Math.round((item.amountIn / maxVal) * 85))
+        : 4; // subtle 4% baseline so the user can hover on any day
 
       const col = document.createElement('div');
       col.className = `bar-column ${isHighlighted ? 'highlighted' : ''}`;
@@ -1601,15 +1708,15 @@ const App = {
       if (isHighlighted) {
         floatingCardHTML = `
           <div class="chart-floating-card">
-            <div class="floating-value">${ReportGenerator.formatRupiah(item.amountIn)}</div>
-            <div class="floating-label">${item.sub || 'Total Kas Hari Ini'}</div>
+            <div class="floating-value">${Utils.formatRupiah(item.amountIn)}</div>
+            <div class="floating-label">${item.sub}: ${item.amountIn > 0 ? 'Total Kas Masuk' : 'Belum Ada Transaksi'}</div>
           </div>
         `;
       }
 
       col.innerHTML = `
         ${floatingCardHTML}
-        <div class="bar-body" style="height: ${heightPercent}%;"></div>
+        <div class="bar-body" style="height: ${heightPercent}%; ${item.amountIn === 0 ? 'background: #cbd5e1; opacity: 0.45;' : ''}"></div>
       `;
 
       col.addEventListener('mouseenter', () => {
@@ -1918,33 +2025,54 @@ const App = {
         const tr = document.createElement('tr');
         const waLink = `https://wa.me/${r.phone}?text=${encodeURIComponent(`Halo Bpk/Ibu ${r.nama} (Warga ${r.alamat}), salam dari Pengurus ${this.data.settings.rtName}.`)}`;
 
+        const blockBadge = `${r.blok} No. ${r.noRumah}`;
+        const cleanAlamat = (r.alamat || '').trim();
+        const isDuplicatedAlamat = cleanAlamat.toLowerCase() === blockBadge.toLowerCase() ||
+          cleanAlamat.toLowerCase() === `blok ${r.blok} no. ${r.noRumah}`.toLowerCase() ||
+          cleanAlamat.toLowerCase() === `${r.blok} ${r.noRumah}`.toLowerCase();
+        const extraAlamatHTML = (!isDuplicatedAlamat && cleanAlamat) 
+          ? `<div style="font-size: 11px; color: #64748b; margin-top: 3px;">${cleanAlamat}</div>` 
+          : '';
+
+        let statusBadgeClass = 'badge-approved';
+        if (r.statusHunian === 'Kontrak' || r.statusHunian === 'Sewa') {
+          statusBadgeClass = 'badge-pending';
+        } else if (r.statusHunian === 'Kos' || r.statusHunian === 'Kost') {
+          statusBadgeClass = 'badge-kos';
+        }
+
+        const rawPhone = String(r.phone || '').trim();
+        const displayPhone = rawPhone.startsWith('62') ? ('0' + rawPhone.slice(2)) : rawPhone;
+
         tr.innerHTML = `
-          <td style="text-align: center; color: var(--text-muted);">${rowNumber}</td>
+          <td style="text-align: center; color: var(--text-muted); font-weight: 600;">${rowNumber}</td>
           <td>
             <div class="table-resident-name">
-              <div class="avatar-img" style="width: 32px; height: 32px; font-size: 11px;">
+              <div class="avatar-img" style="width: 34px; height: 34px; font-size: 11.5px;">
                 ${r.nama.split(' ').map(n=>n[0]).join('').slice(0, 2)}
               </div>
               <div>
-                <strong>${r.nama}</strong><br>
+                <strong style="color: #1e293b; font-size: 13.5px;">${r.nama}</strong><br>
                 <span style="font-size: 11px; color: #64748b;">NIK: ${r.nik || '-'}</span>
               </div>
             </div>
           </td>
           <td>
-            <span class="badge-block">${r.blok} No. ${r.noRumah}</span><br>
-            <span style="font-size: 11px; color: #64748b;">${r.alamat}</span>
+            <span class="badge-block">${blockBadge}</span>
+            ${extraAlamatHTML}
           </td>
           <td>
-            <span class="badge-status ${r.statusHunian === 'Pemilik Tetap' ? 'badge-approved' : 'badge-pending'}">
+            <span class="badge-status ${statusBadgeClass}">
               ${r.statusHunian}
             </span>
           </td>
-          <td style="text-align: center;"><strong>${r.jumlahAnggota || (r.familyMembers ? r.familyMembers.length : 1)}</strong> Jiwa</td>
+          <td style="text-align: center; font-weight: 700; color: #0f766e;">
+            ${r.jumlahAnggota || (r.familyMembers ? r.familyMembers.length : 1)} <span style="font-weight: 500; font-size: 12px; color: #64748b;">Jiwa</span>
+          </td>
           <td>
-            <a href="${waLink}" target="_blank" class="btn-icon-action btn-icon-wa" title="Kirim Pesan WhatsApp">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
-              <span style="margin-left: 6px; font-size: 12px; font-weight: 600;">${r.phone}</span>
+            <a href="${waLink}" target="_blank" class="btn-table-wa" title="Hubungi via WhatsApp">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+              <span>${displayPhone}</span>
             </a>
           </td>
           <td class="pengurus-only">
@@ -1960,13 +2088,13 @@ const App = {
           </td>
           <td class="pengurus-only">
             <div class="table-actions">
-              <button class="btn-icon-action" title="Lihat Anggota Keluarga & Dokumen KK/KTP" onclick="App.openAdminResidentDetail('${r.id}')" style="color: #0f766e;">
-                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              <button class="btn-action-round btn-action-teal" title="Lihat Dokumen KTP, KK & Anggota Keluarga" onclick="App.openAdminResidentDetail('${r.id}')">
+                <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
               </button>
-              <button class="btn-icon-action" title="Edit Data Warga" onclick="App.editResident('${r.id}')">
+              <button class="btn-action-round btn-action-blue" title="Edit Data Warga" onclick="App.editResident('${r.id}')">
                 <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
               </button>
-              <button class="btn-icon-action" style="color: #ef4444;" title="Hapus Data Warga" onclick="App.deleteResident('${r.id}')">
+              <button class="btn-action-round btn-action-red" title="Hapus Data Warga" onclick="App.deleteResident('${r.id}')">
                 <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
               </button>
             </div>
@@ -3656,56 +3784,58 @@ const App = {
         const alamatWarga = resident ? `${resident.blok} No. ${resident.nomorRumah || '-'}` : (col.blokAsal || '-');
         const pStr = String(col.phone || '');
         const phoneFormatted = pStr.startsWith('62') ? '0' + pStr.slice(2) : pStr;
+        const waLink = `https://wa.me/${col.phone || ''}?text=${encodeURIComponent(`Halo ${col.nama}, salam dari Bendahara ${this.data.settings.rtName}.`)}`;
 
         tableRows += `
           <tr>
             <td style="text-align: center; font-weight: 700; color: #64748b;">${idx + 1}</td>
             <td>
               <div style="display: flex; align-items: center; gap: 12px;">
-                <div style="width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, #0d9488, #0f766e); color: white; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; flex-shrink: 0; box-shadow: 0 2px 6px rgba(13, 148, 136, 0.25);">
+                <div style="width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #0d9488, #0f766e); color: white; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 12.5px; flex-shrink: 0; box-shadow: 0 2px 6px rgba(13, 148, 136, 0.2);">
                   ${(col.nama || 'PT').split(' ').map(n=>n[0]).join('').slice(0, 2)}
                 </div>
                 <div>
-                  <div style="font-weight: 800; font-size: 14px; color: #1e293b; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                  <div style="font-weight: 700; font-size: 13.5px; color: #1e293b; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                     <span>${col.nama}</span>
-                    <span class="badge-block" style="font-size: 10.5px; padding: 2px 7px;">Warga Asli</span>
+                    <span class="badge-block" style="font-size: 10px; padding: 1px 6px;">Warga Asli</span>
                   </div>
-                  <div style="font-size: 11.5px; color: #64748b; margin-top: 2px;">
+                  <div style="font-size: 11px; color: #64748b; margin-top: 2px;">
                     🏠 Tempat Tinggal: <strong>${alamatWarga}</strong>
                   </div>
                 </div>
               </div>
             </td>
             <td>
-              <span class="badge-block" style="font-size: 12px; font-weight: 800; padding: 4px 10px; background: #e0f2fe; color: #0369a1; border-color: #bae6fd;">
+              <span class="badge-block" style="font-size: 11.5px; font-weight: 700; padding: 4px 10px; background: #e0f2fe; color: #0369a1; border-color: #bae6fd;">
                 📌 ${col.blokTugas}
               </span>
             </td>
             <td>
               <div style="display: flex; flex-direction: column; gap: 3px;">
                 <div style="font-size: 12px; color: #334155;">
-                  User: <strong style="color: #0f766e; font-family: monospace; font-size: 12.5px;">${col.username}</strong>
+                  User: <strong style="color: #0f766e; font-family: monospace; font-size: 12px;">${col.username}</strong>
                 </div>
                 <div style="font-size: 12px; color: #64748b; display: flex; align-items: center; gap: 4px;">
                   Pass: <span id="colPass_${col.id}" data-actual="${col.password}" data-hidden="true" style="font-family: monospace; font-weight: 700; color: #1e293b;">••••••</span>
-                  <button type="button" class="btn-icon-action" style="padding: 1px 4px; font-size: 11px;" title="Intip / Sembunyikan Password" onclick="App.togglePetugasPasswordVisibility('colPass_${col.id}', this)">👁️</button>
+                  <button type="button" class="btn-icon-action" style="padding: 1px 4px; width: 22px; height: 22px; font-size: 11px;" title="Lihat / Sembunyikan Password" onclick="App.togglePetugasPasswordVisibility('colPass_${col.id}', this)">👁️</button>
                 </div>
               </div>
             </td>
             <td>
-              <a href="https://wa.me/${col.phone}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; color: #059669; text-decoration: none; background: #ecfdf5; border: 1px solid #a7f3d0; padding: 4px 10px; border-radius: 9999px;">
-                <span>💬 ${phoneFormatted}</span>
+              <a href="${waLink}" target="_blank" rel="noopener noreferrer" class="btn-table-wa" title="Hubungi Petugas via WhatsApp">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+                <span>${phoneFormatted}</span>
               </a>
             </td>
             <td>
-              <div style="display: flex; gap: 6px; align-items: center;">
-                <button type="button" class="btn-icon-action" title="Salin Kredensial Login untuk Petugas via WA" onclick="App.copyPetugasCredential('${col.id}')" style="color: #0284c7; background: #e0f2fe;">
+              <div class="table-actions">
+                <button type="button" class="btn-action-round btn-action-blue" title="Salin Kredensial Login Petugas" onclick="App.copyPetugasCredential('${col.id}')">
                   <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                 </button>
-                <button type="button" class="btn-icon-action" title="Edit Petugas" onclick="App.editPetugas('${col.id}')" style="color: #0d9488; background: #ccfbf1;">
+                <button type="button" class="btn-action-round btn-action-teal" title="Edit Petugas" onclick="App.editPetugas('${col.id}')">
                   <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                 </button>
-                <button type="button" class="btn-icon-action" title="Hapus / Cabut Penugasan Petugas" onclick="App.deletePetugas('${col.id}')" style="color: #ef4444; background: #fee2e2;">
+                <button type="button" class="btn-action-round btn-action-red" title="Hapus / Cabut Penugasan Petugas" onclick="App.deletePetugas('${col.id}')">
                   <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                 </button>
               </div>
@@ -3714,6 +3844,10 @@ const App = {
         `;
       });
     }
+
+    const blockPills = assignedBlocks.length > 0
+      ? assignedBlocks.map(b => `<span class="badge-block" style="font-size: 11px; padding: 2px 8px; background: #e0f2fe; color: #0369a1; border-color: #bae6fd;">${b}</span>`).join(' ')
+      : '<span style="font-size: 12.5px; color: #94a3b8;">Belum diatur</span>';
 
     container.innerHTML = `
       <div class="page-title-row">
@@ -3751,7 +3885,9 @@ const App = {
           </div>
           <div class="metric-info">
             <span class="metric-label">Wilayah Blok Ter-cover</span>
-            <span class="metric-value" style="font-size: 16px; line-height: 1.3;">${assignedBlocks.join(', ') || 'Belum diatur'}</span>
+            <div style="display: flex; gap: 5px; flex-wrap: wrap; margin-top: 5px;">
+              ${blockPills}
+            </div>
           </div>
         </div>
 
@@ -3761,7 +3897,7 @@ const App = {
           </div>
           <div class="metric-info">
             <span class="metric-label">Kas di Tangan Petugas</span>
-            <span class="metric-value" style="color: #b45309;">${Utils.formatRupiah(totalKasDiTangan)}</span>
+            <span class="metric-value" style="color: #b45309; font-size: 19px; white-space: nowrap;">${Utils.formatRupiah(totalKasDiTangan)}</span>
           </div>
         </div>
 
@@ -3785,8 +3921,8 @@ const App = {
           </div>
         </div>
 
-        <div class="table-responsive">
-          <table class="data-table">
+        <div class="data-table-container">
+          <table class="app-table">
             <thead>
               <tr>
                 <th style="width: 48px; text-align: center;">No</th>
@@ -3794,7 +3930,7 @@ const App = {
                 <th>Blok Tanggung Jawab</th>
                 <th>Akun Login (Pengurus)</th>
                 <th>Kontak WhatsApp</th>
-                <th style="width: 140px;">Aksi</th>
+                <th style="width: 140px; text-align: center;">Aksi</th>
               </tr>
             </thead>
             <tbody>
@@ -3805,17 +3941,53 @@ const App = {
       </div>
 
       <!-- Panduan & Alur Kerja Petugas Blok -->
-      <div style="background: linear-gradient(135deg, #f8fafc, #f1f5f9); border: 1px solid #e2e8f0; border-radius: 16px; padding: 20px 24px;">
-        <div style="display: flex; align-items: center; gap: 8px; font-weight: 800; color: #0f766e; font-size: 14px; margin-bottom: 8px;">
-          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-          <span>Petunjuk Alur Kerja & Hak Akses Petugas Blok:</span>
+      <div style="margin-top: 24px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 22px 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; border-bottom: 1px solid #f1f5f9; padding-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="width: 34px; height: 34px; border-radius: 10px; background: #f0fdfa; color: #0d9488; display: flex; align-items: center; justify-content: center; font-size: 17px; border: 1px solid #ccfbf1;">
+              💡
+            </div>
+            <div>
+              <h3 style="margin: 0; font-size: 15px; font-weight: 700; color: #1e293b;">Petunjuk Alur Kerja & Hak Akses Petugas Blok</h3>
+              <p style="margin: 2px 0 0 0; font-size: 12px; color: #64748b;">Standar Operasional Prosedur (SOP) penarikan iuran & pelaporan ke Bendahara RT</p>
+            </div>
+          </div>
+          <span class="badge-approved" style="font-size: 11.5px; font-weight: 700; padding: 4px 10px;">SOP Resmi Pengurus</span>
         </div>
-        <ol style="margin: 0; padding-left: 20px; font-size: 12.5px; color: #475569; line-height: 1.8;">
-          <li><strong>Dipilih dari Warga Blok:</strong> Petugas diangkat langsung dari kepala keluarga yang tinggal di blok terkait agar mengenal warga yang ditagih.</li>
-          <li><strong>Login lewat Tab "Pengurus":</strong> Petugas masuk ke sistem menggunakan tab <em>Pengurus</em> dengan username dan password yang diberikan oleh Bendahara/Ketua RT.</li>
-          <li><strong>Kwitansi WhatsApp Otomatis:</strong> Setelah mencentang lunas iuran rumah warga, petugas bisa langsung menekan tombol hijau untuk mengirim bukti kwitansi WA resmi beratasnamakan petugas tersebut.</li>
-          <li><strong>Serah Terima Kas ke Bendahara:</strong> Uang tunai yang terkumpul di lapangan dicatat di sistem dan disetorkan ke Bendahara Utama via menu <em>Setoran Blok</em> untuk diverifikasi.</li>
-        </ol>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px;">
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px 18px;">
+            <div style="display: flex; align-items: center; gap: 9px; margin-bottom: 8px;">
+              <span style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: #0f766e; color: #ffffff; font-size: 12px; font-weight: 800;">1</span>
+              <strong style="font-size: 13.5px; color: #0f172a;">Warga Asli Blok</strong>
+            </div>
+            <p style="margin: 0; font-size: 12px; color: #64748b; line-height: 1.6;">Petugas diangkat dari kepala keluarga di blok setempat sehingga saling kenal dan penagihan lebih ramah & efektif.</p>
+          </div>
+
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px 18px;">
+            <div style="display: flex; align-items: center; gap: 9px; margin-bottom: 8px;">
+              <span style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: #0f766e; color: #ffffff; font-size: 12px; font-weight: 800;">2</span>
+              <strong style="font-size: 13.5px; color: #0f172a;">Login Tab "Pengurus"</strong>
+            </div>
+            <p style="margin: 0; font-size: 12px; color: #64748b; line-height: 1.6;">Masuk menggunakan username dan password yang diberikan Bendahara. Sistem otomatis membatasi akses hanya ke warga blok tugasnya.</p>
+          </div>
+
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px 18px;">
+            <div style="display: flex; align-items: center; gap: 9px; margin-bottom: 8px;">
+              <span style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: #0f766e; color: #ffffff; font-size: 12px; font-weight: 800;">3</span>
+              <strong style="font-size: 13.5px; color: #0f172a;">Kwitansi WA Instan</strong>
+            </div>
+            <p style="margin: 0; font-size: 12px; color: #64748b; line-height: 1.6;">Setelah mencentang lunas iuran warga, tekan tombol hijau untuk langsung kirim bukti kwitansi WA resmi beratasnamakan petugas.</p>
+          </div>
+
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px 18px;">
+            <div style="display: flex; align-items: center; gap: 9px; margin-bottom: 8px;">
+              <span style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: #0f766e; color: #ffffff; font-size: 12px; font-weight: 800;">4</span>
+              <strong style="font-size: 13.5px; color: #0f172a;">Setor Kas ke Bendahara</strong>
+            </div>
+            <p style="margin: 0; font-size: 12px; color: #64748b; line-height: 1.6;">Uang tunai disetorkan berkala ke Bendahara RT lewat menu "Setoran Blok" untuk diverifikasi dan masuk kas utama.</p>
+          </div>
+        </div>
       </div>
     `;
   },
