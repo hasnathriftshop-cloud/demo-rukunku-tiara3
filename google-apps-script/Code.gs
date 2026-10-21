@@ -1,1263 +1,649 @@
 /**
- * ============================================================================
- * RukunKu - Google Apps Script Backend API (Versi Lengkap & Multi-User Aman)
- * Lingkungan RT 05 / RW 02 Perum Tiara Candi 3
- * ============================================================================
- * 
- * Script ini berfungsi sebagai REST API backend gratis menggunakan Google Sheets
- * sebagai database untuk webapp RukunKu.
- * 
- * Database Sheets yang Dikelola:
- * 1. Warga      : Data kepala keluarga, NIK, alamat, WhatsApp, dan dokumen
- * 2. Transaksi  : Buku kas masuk dan keluar RT
- * 3. Iuran      : Matriks checklist status pembayaran iuran 12 bulan
- * 4. Talangan   : Catatan kasbon / dana talangan warga
- * 5. Pengaturan : Pengaturan identitas RT, nama perumahan, blok, dan kategori kas
- * 6. Petugas    : Akun petugas penagih iuran per blok RT
- * 7. Setoran    : Riwayat serah terima setoran kas dari petugas ke bendahara
+ * RukunKu - Google Sheets & Apps Script Cloud Sync Module
+ * Enables real-time synchronization between RukunKu and Google Spreadsheet
  */
 
-// Nama-nama sheet yang digunakan
-const SHEET_NAMES = {
-  WARGA: 'Warga',
-  TRANSAKSI: 'Transaksi',
-  IURAN: 'Iuran',
-  TALANGAN: 'Talangan',
-  PENGATURAN: 'Pengaturan',
-  PETUGAS: 'Petugas',
-  SETORAN: 'Setoran'
+const CloudSync = {
+  // URL Web App Google Apps Script default lingkungan RT 05 / RW 02 Perum Tiara Candi 3
+  DEFAULT_GAS_URL: 'https://script.google.com/macros/s/AKfycbxN-hWB9wZLcKLuUEA2dXX2D23DPrTHPYYkJwmmViq2EdFbwvg0KYEXvAUQFL1FU6JW6w/exec',
+  STORAGE_KEY_URL: 'rukunku_gas_url',
+  STORAGE_KEY_LAST_SYNC: 'rukunku_last_sync_time',
+  
+  status: 'disconnected', // 'disconnected' | 'connected' | 'syncing' | 'error'
+  lastSyncTime: null,
+  hasPulledOnce: false,
+  debounceTimer: null,
+  lastPullTimestamp: 0,
+
+  init() {
+    this.lastSyncTime = localStorage.getItem(this.STORAGE_KEY_LAST_SYNC) || null;
+    this.updateStatusUI();
+
+    const gasUrl = this.getGasUrl();
+    if (gasUrl) {
+      // Auto-pull updates on startup from Google Sheets
+      this.pullFromSheets({ silent: true });
+    }
+
+    // Auto-refresh data saat user kembali membuka tab browser RukunKu
+    window.addEventListener('focus', () => {
+      if (this.getGasUrl() && Date.now() - this.lastPullTimestamp > 5000 && this.status !== 'syncing') {
+        this.pullFromSheets({ silent: true });
+      }
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && this.getGasUrl() && Date.now() - this.lastPullTimestamp > 5000 && this.status !== 'syncing') {
+        this.pullFromSheets({ silent: true });
+      }
+    });
+
+    // Smart Background Polling: cek data baru dari Google Sheets setiap 25 detik saat tab aktif
+    setInterval(() => {
+      if (document.visibilityState === 'visible' && this.getGasUrl() && this.status !== 'syncing' && Date.now() - this.lastPullTimestamp > 20000) {
+        this.pullFromSheets({ silent: true });
+      }
+    }, 25000);
+  },
+
+  getGasUrl() {
+    return localStorage.getItem(this.STORAGE_KEY_URL) || this.DEFAULT_GAS_URL || '';
+  },
+
+  setGasUrl(url) {
+    const cleanUrl = (url || '').trim();
+    if (cleanUrl) {
+      localStorage.setItem(this.STORAGE_KEY_URL, cleanUrl);
+    } else {
+      localStorage.removeItem(this.STORAGE_KEY_URL);
+    }
+    this.updateStatusUI();
+  },
+
+  // Update Status Pill in Header and Modal
+  updateStatusUI() {
+    const gasUrl = this.getGasUrl();
+    const cloudPill = document.getElementById('cloudSyncPill');
+    const cloudDot = document.getElementById('cloudSyncDot');
+    const cloudText = document.getElementById('cloudSyncText');
+    const modalStatusBox = document.getElementById('modalCloudStatus');
+    const lastSyncEl = document.getElementById('cloudLastSyncText');
+
+    if (!cloudPill) return;
+
+    if (!gasUrl) {
+      this.status = 'disconnected';
+      if (cloudDot) cloudDot.style.background = '#94a3b8';
+      if (cloudText) cloudText.textContent = 'Mode: Database Lokal';
+      cloudPill.title = 'Belum terhubung ke Google Sheets. Klik untuk mengonfigurasi.';
+      
+      if (modalStatusBox) {
+        modalStatusBox.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 10px; color: #64748b;">
+            <span style="width: 10px; height: 10px; border-radius: 50%; background: #94a3b8; display: inline-block;"></span>
+            <span>Database Lokal Aktif (Data tersimpan di browser ini)</span>
+          </div>
+        `;
+      }
+    } else if (this.status === 'syncing') {
+      if (cloudDot) cloudDot.style.background = '#f59e0b';
+      if (cloudText) cloudText.textContent = 'Menyinkronkan...';
+    } else if (this.status === 'connected') {
+      if (cloudDot) cloudDot.style.background = '#10b981';
+      if (cloudText) cloudText.textContent = 'Google Sheet Terhubung';
+      cloudPill.title = 'Terhubung ke Google Sheets. Klik untuk detail / sync manual.';
+      
+      if (modalStatusBox) {
+        modalStatusBox.innerHTML = `
+          <div style="display: flex; align-items: center; justify-content: space-between; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 12px; padding: 12px 14px;">
+            <div style="display: flex; align-items: center; gap: 10px; color: #065f46; font-weight: 600; font-size: 13px;">
+              <span style="width: 10px; height: 10px; border-radius: 50%; background: #10b981; display: inline-block;"></span>
+              <span>Terhubung ke Cloud Google Sheets</span>
+            </div>
+            <span style="font-size: 11px; color: #047857;">Aktif</span>
+          </div>
+        `;
+      }
+    } else if (this.status === 'error') {
+      if (cloudDot) cloudDot.style.background = '#ef4444';
+      if (cloudText) cloudText.textContent = 'Sync Gagal';
+      cloudPill.title = 'Gagal berkomunikasi dengan Google Sheets. Periksa URL Anda.';
+    }
+
+    if (lastSyncEl && this.lastSyncTime) {
+      lastSyncEl.textContent = `Sinkronisasi terakhir: ${new Date(this.lastSyncTime).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
+    }
+  },
+
+  // Immediate push snapshot to Google Sheets
+  async syncNow() {
+    const gasUrl = this.getGasUrl();
+    if (!gasUrl) return;
+    if (this.debounceTimer) clearTimeout(this.debounceTimer);
+    try {
+      const localData = DB.load();
+      await fetch(gasUrl, {
+        method: 'POST',
+        mode: 'cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'syncAll', data: localData })
+      });
+      this.status = 'connected';
+      this.lastSyncTime = new Date().toISOString();
+      localStorage.setItem(this.STORAGE_KEY_LAST_SYNC, this.lastSyncTime);
+      this.updateStatusUI();
+    } catch (err) {
+      console.warn("Background immediate sync error:", err);
+    }
+  },
+
+  // Debounced background auto-sync when changes occur
+  autoSyncBackground() {
+    const gasUrl = this.getGasUrl();
+    if (!gasUrl) return;
+
+    // PENGAMAN: Jangan auto-sync jika pengunjung baru belum pernah berhasil menarik data dari Cloud
+    // Ini mencegah browser baru tanpa cache menimpa data Cloud dengan data demo default.
+    if (!this.hasPulledOnce && !localStorage.getItem(this.STORAGE_KEY_LAST_SYNC)) {
+      console.log("[CloudSync] Auto-sync ditangguhkan sampai pull awal dari cloud selesai.");
+      return;
+    }
+
+    if (this.debounceTimer) clearTimeout(this.debounceTimer);
+    this.debounceTimer = setTimeout(async () => {
+      await this.syncNow();
+    }, 1200);
+  },
+
+  // Test Connection
+  async testConnection(url) {
+    const targetUrl = (url || this.getGasUrl()).trim();
+    if (!targetUrl) {
+      alert("Masukkan URL Web App Google Apps Script terlebih dahulu!");
+      return false;
+    }
+
+    this.status = 'syncing';
+    this.updateStatusUI();
+
+    try {
+      const pingUrl = targetUrl + (targetUrl.includes('?') ? '&' : '?') + 'action=ping&t=' + Date.now();
+      const res = await fetch(pingUrl, { method: 'GET', mode: 'cors' });
+      const data = await res.json();
+
+      if (data && data.status === 'success') {
+        this.status = 'connected';
+        this.setGasUrl(targetUrl);
+        this.updateStatusUI();
+        alert("✅ Koneksi Berhasil! Google Apps Script siap digunakan sebagai database RukunKu.");
+        return true;
+      } else {
+        throw new Error(data.message || 'Respons tidak valid');
+      }
+    } catch (err) {
+      this.status = 'error';
+      this.updateStatusUI();
+      alert("❌ Gagal terhubung ke Google Apps Script.\n\nPastikan:\n1. URL berakhiran /exec\n2. Saat Deploy, akses diatur ke 'Anyone'\n\nPesan error: " + err.message);
+      return false;
+    }
+  },
+
+  // Pull Data from Google Sheets (GET action=getData)
+  async pullFromSheets(options = {}) {
+    const gasUrl = this.getGasUrl();
+    if (!gasUrl) return;
+
+    this.lastPullTimestamp = Date.now();
+    this.status = 'syncing';
+    this.updateStatusUI();
+
+    try {
+      const getUrl = gasUrl + (gasUrl.includes('?') ? '&' : '?') + 'action=getData&t=' + Date.now();
+      const res = await fetch(getUrl, { method: 'GET', mode: 'cors' });
+      const json = await res.json();
+
+      if (json && json.status === 'success' && json.data) {
+        const cloudData = json.data;
+        const currentLocal = DB.load();
+
+        // Cek apakah di Google Sheets sudah ada data warga nyata
+        const hasCloudResidents = Array.isArray(cloudData.residents) && cloudData.residents.length > 0;
+        const residentsToUse = hasCloudResidents
+          ? cloudData.residents.map(cr => {
+              const localMatch = (currentLocal.residents || []).find(lr => lr.id === cr.id);
+              
+              // Gabungkan familyMembers agar fotoKtp lokal tidak terhapus jika cloud mengembalikan string kosong
+              const mergedFamily = (cr.familyMembers || []).map((cfm, idx) => {
+                const lfm = (localMatch && localMatch.familyMembers)
+                  ? (localMatch.familyMembers.find(m => m.id === cfm.id) || localMatch.familyMembers[idx])
+                  : null;
+                return {
+                  ...cfm,
+                  fotoKtp: cfm.fotoKtp || (lfm && lfm.fotoKtp ? lfm.fotoKtp : '')
+                };
+              });
+
+              // Pertahankan daftar anggota keluarga lokal jika lokal memiliki data lebih lengkap/baru
+              let finalFamily = mergedFamily.length > 0 ? mergedFamily : (cr.familyMembers || []);
+              if (localMatch && Array.isArray(localMatch.familyMembers) && localMatch.familyMembers.length > finalFamily.length) {
+                finalFamily = localMatch.familyMembers;
+              }
+
+              // Pastikan jumlahAnggota tidak turun kembali menjadi 1 jika di lokal atau cloud ada angka lebih besar
+              const safeJumlah = Math.max(
+                Number(cr.jumlahAnggota) || 1,
+                Number(localMatch ? localMatch.jumlahAnggota : 1) || 1,
+                finalFamily.length || 1
+              );
+
+              return {
+                ...cr,
+                jumlahAnggota: safeJumlah,
+                password: cr.password || (localMatch && localMatch.password ? localMatch.password : '123456'),
+                fotoKk: cr.fotoKk || (localMatch && localMatch.fotoKk ? localMatch.fotoKk : ''),
+                familyMembers: finalFamily
+              };
+            })
+          : (currentLocal.residents || []);
+
+        // Pastikan categories memiliki format array yang aman
+        let cleanCategories = currentLocal.categories;
+        if (cloudData.categories && typeof cloudData.categories === 'object') {
+          cleanCategories = {
+            masuk: Array.isArray(cloudData.categories.masuk) ? cloudData.categories.masuk : (currentLocal.categories?.masuk || []),
+            keluar: Array.isArray(cloudData.categories.keluar) ? cloudData.categories.keluar : (currentLocal.categories?.keluar || [])
+          };
+        }
+
+        // Pastikan phone bertipe string dan assignedBlocks bertipe array
+        const cleanCollectors = Array.isArray(cloudData.collectors)
+          ? cloudData.collectors.map(c => ({
+              ...c,
+              phone: String(c.phone || '').replace(/^'/, ''),
+              assignedBlocks: Array.isArray(c.assignedBlocks) ? c.assignedBlocks : [String(c.blokTugas || '')]
+            }))
+          : (currentLocal.collectors || []);
+
+        const merged = {
+          ...currentLocal,
+          settings: cloudData.settings || currentLocal.settings,
+          blocks: (cloudData.blocks && Array.isArray(cloudData.blocks) && cloudData.blocks.length > 0) ? cloudData.blocks : currentLocal.blocks,
+          categories: cleanCategories,
+          residents: residentsToUse,
+          transactions: Array.isArray(cloudData.transactions) ? cloudData.transactions : (currentLocal.transactions || []),
+          duesMatrix: cloudData.duesMatrix || currentLocal.duesMatrix,
+          talangan: Array.isArray(cloudData.talangan) ? cloudData.talangan : (currentLocal.talangan || []),
+          collectors: cleanCollectors,
+          setoranBlok: Array.isArray(cloudData.setoranBlok) ? cloudData.setoranBlok : (currentLocal.setoranBlok || []),
+          masjidSettings: cloudData.masjidSettings || currentLocal.masjidSettings,
+          masjidAdmin: cloudData.masjidAdmin || currentLocal.masjidAdmin,
+          masjidTransactions: (Array.isArray(cloudData.masjidTransactions) && cloudData.masjidTransactions.length > 0) ? cloudData.masjidTransactions : (currentLocal.masjidTransactions || []),
+          masjidAssets: (Array.isArray(cloudData.masjidAssets) && cloudData.masjidAssets.length > 0) ? cloudData.masjidAssets : (currentLocal.masjidAssets || [])
+        };
+
+        // Simpan ke local tanpa trigger auto-sync balik ke server
+        DB.save(merged, { skipSync: true });
+        this.hasPulledOnce = true;
+
+        if (window.App) {
+          window.App.data = merged;
+          // Hanya re-render view utama jika user sudah login
+          if (window.AppState && window.AppState.currentUser) {
+            try {
+              if (typeof window.App.updateSettingsUI === 'function') window.App.updateSettingsUI();
+              if (typeof window.App.renderBlockOptions === 'function') window.App.renderBlockOptions();
+              if (typeof window.App.renderDashboard === 'function') window.App.renderDashboard();
+              if (typeof window.App.renderResidents === 'function') window.App.renderResidents();
+              if (typeof window.App.renderTransactions === 'function') window.App.renderTransactions();
+              if (typeof window.App.renderDuesMatrix === 'function') window.App.renderDuesMatrix();
+              if (typeof window.App.renderTalangan === 'function') window.App.renderTalangan();
+              if (typeof window.App.renderFinancialReport === 'function') window.App.renderFinancialReport();
+              if (typeof window.App.renderSetoranBlok === 'function') window.App.renderSetoranBlok();
+              if (typeof window.App.renderKelolaPetugasPage === 'function') window.App.renderKelolaPetugasPage();
+              if (typeof window.App.renderPetugasList === 'function') window.App.renderPetugasList();
+              if (typeof window.App.updateNotificationBadge === 'function') window.App.updateNotificationBadge();
+              if (window.AppState.currentRole === 'admin_masjid') {
+                if (typeof window.App.renderMasjidDashboard === 'function') window.App.renderMasjidDashboard();
+                if (typeof window.App.renderMasjidKas === 'function') window.App.renderMasjidKas();
+                if (typeof window.App.renderMasjidAset === 'function') window.App.renderMasjidAset();
+                if (typeof window.App.renderMasjidLaporan === 'function') window.App.renderMasjidLaporan();
+              }
+            } catch (renderErr) {
+              console.warn("[CloudSync] Background render error:", renderErr);
+            }
+          } else {
+            // Jika user masih di halaman login / register, cukup update opsi blok registrasi & judul lingkungan
+            try {
+              if (typeof window.App.updateSettingsUI === 'function') window.App.updateSettingsUI();
+              if (typeof window.App.renderBlockOptions === 'function') window.App.renderBlockOptions();
+            } catch (e) {}
+          }
+        }
+
+        this.status = 'connected';
+        this.lastSyncTime = new Date().toISOString();
+        localStorage.setItem(this.STORAGE_KEY_LAST_SYNC, this.lastSyncTime);
+        this.updateStatusUI();
+
+        if (!options.silent) {
+          alert("✅ Data berhasil ditarik dan diperbarui dari Google Sheets!");
+        }
+      } else {
+        throw new Error(json.message || 'Gagal memuat data dari cloud');
+      }
+    } catch (err) {
+      console.warn("Gagal sinkronisasi dari Google Sheets:", err);
+      this.status = 'error';
+      this.updateStatusUI();
+      if (!options.silent) {
+        alert("⚠️ Gagal menarik data dari Google Sheets. Aplikasi tetap menggunakan data lokal.");
+      }
+    }
+  },
+
+  // Push Local Data Snapshot to Google Sheets (POST action=syncAll)
+  async pushToSheets() {
+    const gasUrl = this.getGasUrl();
+    if (!gasUrl) {
+      alert("Harap masukkan URL Web App Google Apps Script terlebih dahulu!");
+      return;
+    }
+
+    if (!confirm("Kirim seluruh data lokal (warga, transaksi, iuran, talangan, petugas, setoran) ke Google Sheets? Data di Spreadsheet akan disinkronkan.")) {
+      return;
+    }
+
+    this.status = 'syncing';
+    this.updateStatusUI();
+
+    const localData = DB.load();
+    if (localData.residents && Array.isArray(localData.residents)) {
+      localData.residents.forEach(r => {
+        if (!r.password) r.password = '123456';
+      });
+    }
+    const payload = {
+      action: 'syncAll',
+      data: localData
+    };
+
+    try {
+      const res = await fetch(gasUrl, {
+        method: 'POST',
+        mode: 'cors',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const json = await res.json();
+      if (json && json.status === 'success') {
+        this.status = 'connected';
+        this.lastSyncTime = new Date().toISOString();
+        localStorage.setItem(this.STORAGE_KEY_LAST_SYNC, this.lastSyncTime);
+        this.updateStatusUI();
+        alert("🎉 Berhasil! Seluruh data warga, kas, dan iuran telah tersimpan di Google Sheets Anda.");
+      } else {
+        throw new Error(json.message || 'Gagal menyimpan ke Google Sheets');
+      }
+    } catch (err) {
+      this.status = 'error';
+      this.updateStatusUI();
+      alert("❌ Terjadi kesalahan saat mengirim data ke Google Sheets: " + err.message);
+    }
+  },
+
+  // =========================================================================
+  // SINGLE-ENTITY DIRECT SYNC METHODS (Aman dari Konflik Antar Perangkat)
+  // =========================================================================
+
+  // Tambah / Update data warga langsung ke Google Sheets (sheet Warga)
+  async saveResidentDirect(resident) {
+    const gasUrl = this.getGasUrl();
+    if (!gasUrl || !resident) return false;
+    try {
+      this.status = 'syncing';
+      this.updateStatusUI();
+      const res = await fetch(gasUrl, {
+        method: 'POST',
+        mode: 'cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'saveResident', resident })
+      });
+      const json = await res.json();
+      if (json && json.status === 'success') {
+        // Jika server mengembalikan resident dengan URL Google Drive, update data lokal segera
+        if (json.resident) {
+          const currentLocal = DB.load();
+          const rIdx = (currentLocal.residents || []).findIndex(r => r.id === json.resident.id);
+          if (rIdx !== -1) {
+            const preservedJumlah = Math.max(
+              Number(currentLocal.residents[rIdx].jumlahAnggota) || 1,
+              Number(json.resident.jumlahAnggota) || 1,
+              (json.resident.familyMembers ? json.resident.familyMembers.length : 1)
+            );
+            currentLocal.residents[rIdx] = {
+              ...currentLocal.residents[rIdx],
+              ...json.resident,
+              jumlahAnggota: preservedJumlah
+            };
+            DB.save(currentLocal, { skipSync: true });
+            if (window.App) {
+              window.App.data = currentLocal;
+              if (typeof window.App.renderWargaProfile === 'function') window.App.renderWargaProfile();
+              if (typeof window.App.renderResidents === 'function') window.App.renderResidents();
+            }
+          }
+        }
+        this.status = 'connected';
+        this.lastSyncTime = new Date().toISOString();
+        localStorage.setItem(this.STORAGE_KEY_LAST_SYNC, this.lastSyncTime);
+        this.updateStatusUI();
+        return true;
+      }
+    } catch (err) {
+      console.warn("Direct save resident failed:", err);
+    }
+    return false;
+  },
+
+  // Hapus data warga langsung di Google Sheets
+  async deleteResidentDirect(residentId) {
+    const gasUrl = this.getGasUrl();
+    if (!gasUrl || !residentId) return false;
+    try {
+      this.status = 'syncing';
+      this.updateStatusUI();
+      const res = await fetch(gasUrl, {
+        method: 'POST',
+        mode: 'cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'deleteResident', residentId })
+      });
+      const json = await res.json();
+      if (json && json.status === 'success') {
+        this.status = 'connected';
+        this.lastSyncTime = new Date().toISOString();
+        localStorage.setItem(this.STORAGE_KEY_LAST_SYNC, this.lastSyncTime);
+        this.updateStatusUI();
+        return true;
+      }
+    } catch (err) {
+      console.warn("Direct delete resident failed:", err);
+    }
+    return false;
+  },
+
+  // Tambah / Update data petugas penagih langsung ke Google Sheets (sheet Petugas)
+  async saveCollectorDirect(collector) {
+    const gasUrl = this.getGasUrl();
+    if (!gasUrl || !collector) return false;
+    try {
+      this.status = 'syncing';
+      this.updateStatusUI();
+      const res = await fetch(gasUrl, {
+        method: 'POST',
+        mode: 'cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'saveCollector', collector })
+      });
+      const json = await res.json();
+      if (json && json.status === 'success') {
+        this.status = 'connected';
+        this.lastSyncTime = new Date().toISOString();
+        localStorage.setItem(this.STORAGE_KEY_LAST_SYNC, this.lastSyncTime);
+        this.updateStatusUI();
+        return true;
+      }
+    } catch (err) {
+      console.warn("Direct save collector failed:", err);
+    }
+    return false;
+  },
+
+  // Hapus data petugas penagih langsung di Google Sheets
+  async deleteCollectorDirect(collectorId) {
+    const gasUrl = this.getGasUrl();
+    if (!gasUrl || !collectorId) return false;
+    try {
+      this.status = 'syncing';
+      this.updateStatusUI();
+      const res = await fetch(gasUrl, {
+        method: 'POST',
+        mode: 'cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'deleteCollector', collectorId })
+      });
+      const json = await res.json();
+      if (json && json.status === 'success') {
+        this.status = 'connected';
+        this.lastSyncTime = new Date().toISOString();
+        localStorage.setItem(this.STORAGE_KEY_LAST_SYNC, this.lastSyncTime);
+        this.updateStatusUI();
+        return true;
+      }
+    } catch (err) {
+      console.warn("Direct delete collector failed:", err);
+    }
+    return false;
+  },
+
+  // Tambah / Update setoran kas blok langsung ke Google Sheets (sheet Setoran)
+  async saveSetoranDirect(setoran) {
+    const gasUrl = this.getGasUrl();
+    if (!gasUrl || !setoran) return false;
+    try {
+      this.status = 'syncing';
+      this.updateStatusUI();
+      const res = await fetch(gasUrl, {
+        method: 'POST',
+        mode: 'cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'saveSetoran', setoran })
+      });
+      const json = await res.json();
+      if (json && json.status === 'success') {
+        this.status = 'connected';
+        this.lastSyncTime = new Date().toISOString();
+        localStorage.setItem(this.STORAGE_KEY_LAST_SYNC, this.lastSyncTime);
+        this.updateStatusUI();
+        return true;
+      }
+    } catch (err) {
+      console.warn("Direct save setoran failed:", err);
+    }
+    return false;
+  },
+
+  // Upload file bebas atau foto bukti transfer langsung ke Google Drive
+  async uploadFileToDrive(base64Data, fileName, folderName = 'Bukti Transfer Iuran') {
+    const gasUrl = this.getGasUrl();
+    if (!gasUrl || !base64Data) return null;
+    try {
+      this.status = 'syncing';
+      this.updateStatusUI();
+      const res = await fetch(gasUrl, {
+        method: 'POST',
+        mode: 'cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'uploadFile',
+          fileData: base64Data,
+          fileName: fileName,
+          folderName: folderName
+        })
+      });
+      const json = await res.json();
+      this.status = 'connected';
+      this.updateStatusUI();
+      if (json && json.status === 'success' && json.url) {
+        return json.url;
+      }
+    } catch (err) {
+      console.warn("Direct upload to Google Drive failed:", err);
+      this.status = 'error';
+      this.updateStatusUI();
+    }
+    return null;
+  },
+
+  // Tambah / Update transaksi kas masuk / keluar langsung ke Google Sheets & Google Drive
+  async saveTransactionDirect(transaction) {
+    const gasUrl = this.getGasUrl();
+    if (!gasUrl || !transaction) return false;
+    try {
+      this.status = 'syncing';
+      this.updateStatusUI();
+      const res = await fetch(gasUrl, {
+        method: 'POST',
+        mode: 'cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'addTransaction', transaction })
+      });
+      const json = await res.json();
+      this.status = 'connected';
+      this.lastSyncTime = new Date().toISOString();
+      localStorage.setItem(this.STORAGE_KEY_LAST_SYNC, this.lastSyncTime);
+      this.updateStatusUI();
+      if (json && json.status === 'success') {
+        return json.transaction || true;
+      }
+      return true;
+    } catch (err) {
+      console.warn("Direct save transaction failed:", err);
+      this.status = 'error';
+      this.updateStatusUI();
+      return false;
+    }
+  },
+
+  // Update status checklist iuran warga per bulan langsung ke Google Sheets (sheet Iuran)
+  async updateDuesDirect(residentId, month, status) {
+    const gasUrl = this.getGasUrl();
+    if (!gasUrl || !residentId) return false;
+    try {
+      await fetch(gasUrl, {
+        method: 'POST',
+        mode: 'cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'updateDues', residentId, month, status })
+      });
+      return true;
+    } catch (err) {
+      console.warn("Direct update dues failed:", err);
+      return false;
+    }
+  }
 };
 
-/**
- * Handle GET Request (Tarik Data & Healthcheck)
- */
-function doGet(e) {
-  try {
-    const action = (e && e.parameter && e.parameter.action) || 'getData';
+window.CloudSync = CloudSync;
 
-    if (action === 'ping') {
-      return jsonResponse({
-        status: 'success',
-        message: 'API RukunKu Google Sheets aktif & siap digunakan!',
-        timestamp: new Date().toISOString()
-      });
-    }
-
-    if (action === 'initSheets') {
-      const initResult = initializeAllSheets();
-      return jsonResponse({
-        status: 'success',
-        message: 'Inisialisasi 7 sheet RukunKu berhasil dilakukan.',
-        result: initResult
-      });
-    }
-
-    if (action === 'getData') {
-      // Baca langsung tanpa validasi skema berulang agar respons super cepat
-      const allData = fetchAllDataFromSheets();
-      return jsonResponse({
-        status: 'success',
-        data: allData
-      });
-    }
-
-    return jsonResponse({
-      status: 'error',
-      message: 'Aksi GET tidak dikenali: ' + action
-    });
-
-  } catch (err) {
-    return jsonResponse({
-      status: 'error',
-      message: err.toString(),
-      stack: err.stack
-    });
-  }
-}
-
-/**
- * Handle POST Request (Simpan / Sinkronisasi Data)
- */
-function doPost(e) {
-  try {
-    ensureSheetsExist();
-    
-    let payload = {};
-    if (e && e.postData && e.postData.contents) {
-      payload = JSON.parse(e.postData.contents);
-    } else if (e && e.parameter) {
-      payload = e.parameter;
-    }
-
-    const action = payload.action || 'syncAll';
-
-    // 1. Simpan Snapshot Penuh (Sinkronisasi Semua Data Tanpa Hapus Data Lain)
-    if (action === 'syncAll' && payload.data) {
-      saveAllDataToSheets(payload.data);
-      return jsonResponse({
-        status: 'success',
-        message: 'Semua data berhasil disinkronisasikan ke Google Sheets.',
-        timestamp: new Date().toISOString()
-      });
-    }
-
-    // 2. Tambah / Edit Transaksi Kas (Langsung & Aman dengan Google Drive untuk Bukti Transfer)
-    if (action === 'addTransaction' && payload.transaction) {
-      let buktiTransferUrl = payload.transaction.buktiTransfer || payload.transaction.buktiFoto || '';
-      if (buktiTransferUrl && buktiTransferUrl.startsWith('data:image/')) {
-        const cleanJudul = (payload.transaction.judul || 'tx').replace(/[^a-zA-Z0-9]/g, '_');
-        buktiTransferUrl = uploadBase64ToDrive(buktiTransferUrl, 'Bukti_Transfer_' + cleanJudul + '_' + (payload.transaction.id || Date.now()), 'Bukti Transfer Iuran');
-        payload.transaction.buktiTransfer = buktiTransferUrl;
-        payload.transaction.buktiFoto = buktiTransferUrl;
-      }
-      addTransactionRow(payload.transaction);
-      return jsonResponse({
-        status: 'success',
-        message: 'Transaksi kas berhasil dicatat di Google Sheets & Google Drive.',
-        transaction: payload.transaction
-      });
-    }
-
-    // 3. Tambah / Edit Data Warga (Langsung & Aman dengan Google Drive)
-    if (action === 'saveResident' && payload.resident) {
-      const savedRes = upsertResidentRow(payload.resident);
-      return jsonResponse({
-        status: 'success',
-        message: 'Data warga berhasil disimpan di Google Sheets & Google Drive.',
-        resident: savedRes
-      });
-    }
-
-    // 4. Hapus Warga
-    if (action === 'deleteResident' && payload.residentId) {
-      deleteResidentRow(payload.residentId);
-      return jsonResponse({
-        status: 'success',
-        message: 'Data warga berhasil dihapus dari Google Sheets.'
-      });
-    }
-
-    // 5. Tambah / Edit Petugas Penagih Blok
-    if (action === 'saveCollector' && payload.collector) {
-      upsertCollectorRow(payload.collector);
-      return jsonResponse({
-        status: 'success',
-        message: 'Data petugas penagih berhasil disimpan di Google Sheets.'
-      });
-    }
-
-    // 6. Hapus Petugas Penagih Blok
-    if (action === 'deleteCollector' && payload.collectorId) {
-      deleteCollectorRow(payload.collectorId);
-      return jsonResponse({
-        status: 'success',
-        message: 'Data petugas penagih berhasil dihapus dari Google Sheets.'
-      });
-    }
-
-    // 7. Tambah / Update Setoran Kas Blok
-    if (action === 'saveSetoran' && payload.setoran) {
-      upsertSetoranRow(payload.setoran);
-      return jsonResponse({
-        status: 'success',
-        message: 'Data setoran kas berhasil dicatat di Google Sheets.'
-      });
-    }
-
-    // 8. Update Matriks Iuran
-    if (action === 'updateDues' && payload.residentId && payload.month && payload.status) {
-      updateDuesStatus(payload.residentId, payload.month, payload.status);
-      return jsonResponse({
-        status: 'success',
-        message: 'Status iuran berhasil diperbarui.'
-      });
-    }
-
-    // 9. Tambah / Bayar Talangan
-    if (action === 'saveTalangan' && payload.talangan) {
-      upsertTalanganRow(payload.talangan);
-      return jsonResponse({
-        status: 'success',
-        message: 'Catatan talangan berhasil disimpan.'
-      });
-    }
-
-    // 10. Upload Berkas Bebas ke Google Drive (Bukti Transfer / Dokumen Warga)
-    if (action === 'uploadFile' && payload.fileData) {
-      const cleanName = (payload.fileName || ('File_' + Date.now())).replace(/[^a-zA-Z0-9]/g, '_');
-      const folderName = payload.folderName || 'Bukti Transfer Iuran';
-      const fileUrl = uploadBase64ToDrive(payload.fileData, cleanName, folderName);
-      return jsonResponse({
-        status: 'success',
-        url: fileUrl,
-        message: 'Berkas berhasil diunggah ke Google Drive.'
-      });
-    }
-
-    return jsonResponse({
-      status: 'error',
-      message: 'Aksi POST tidak valid: ' + action
-    });
-
-  } catch (err) {
-    return jsonResponse({
-      status: 'error',
-      message: err.toString()
-    });
-  }
-}
-
-function jsonResponse(obj) {
-  return ContentService.createTextOutput(JSON.stringify(obj))
-    .setMimeType(ContentService.MimeType.JSON);
-}
-
-// ============================================================================
-// LOGIKA DATABASE GOOGLE SHEETS
-// ============================================================================
-
-/**
- * Pastikan seluruh lembar kerja (7 sheets) telah ada
- */
-function ensureSheetsExist() {
-  const activeSS = SpreadsheetApp.getActiveSpreadsheet();
-  const sheets = [
-    SHEET_NAMES.WARGA,
-    SHEET_NAMES.TRANSAKSI,
-    SHEET_NAMES.IURAN,
-    SHEET_NAMES.TALANGAN,
-    SHEET_NAMES.PENGATURAN,
-    SHEET_NAMES.PETUGAS,
-    SHEET_NAMES.SETORAN
-  ];
-  
-  sheets.forEach(name => {
-    let sheet = activeSS.getSheetByName(name);
-    if (!sheet) {
-      sheet = activeSS.insertSheet(name);
-      setupSheetHeaders(sheet, name);
-    } else {
-      ensureSheetHeadersOnly(sheet, name);
-    }
+// Bootstrap bulletproof DOM ready
+if (document.readyState !== 'loading') {
+  CloudSync.init();
+} else {
+  document.addEventListener('DOMContentLoaded', () => {
+    CloudSync.init();
   });
-
-  // Hapus sheet bawaan "Sheet1" jika masih kosong
-  const defaultSheet = activeSS.getSheetByName('Sheet1') || activeSS.getSheetByName('Sheet 1');
-  if (defaultSheet && activeSS.getSheets().length > 1) {
-    try { activeSS.deleteSheet(defaultSheet); } catch (e) {}
-  }
-}
-
-function getHeadersForSheet(name) {
-  if (name === SHEET_NAMES.WARGA) {
-    return ['ID', 'Nama Kepala Keluarga', 'NIK', 'No KK', 'Blok', 'No Rumah', 'Alamat', 'No WhatsApp', 'Jumlah Jiwa', 'Status Hunian', 'Pekerjaan', 'Status Aktif', 'Tanggal Masuk', 'Avatar Bg', 'Password', 'Anggota Keluarga (JSON)', 'Foto KK (URL Drive)'];
-  } else if (name === SHEET_NAMES.TRANSAKSI) {
-    return ['ID Transaksi', 'Tanggal', 'Waktu', 'Jenis', 'Kategori', 'Judul Transaksi', 'Keterangan', 'ID Warga', 'Blok / Alamat', 'Nominal (Rp)', 'Metode Bayar', 'Status', 'No Kwitansi', 'Pencatat', 'Bukti Transfer (URL Drive)'];
-  } else if (name === SHEET_NAMES.IURAN) {
-    return ['ID Warga', 'Nama KK', 'Blok/Rumah', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
-  } else if (name === SHEET_NAMES.TALANGAN) {
-    return ['ID', 'ID Warga', 'Nama Peminjam', 'Blok', 'WhatsApp', 'Total Pinjaman', 'Terbayar', 'Sisa Saldo', 'Tgl Pinjam', 'Jatuh Tempo', 'Keperluan', 'Status', 'Keterangan'];
-  } else if (name === SHEET_NAMES.PENGATURAN) {
-    return ['Kunci (Key)', 'Nilai (Value)'];
-  } else if (name === SHEET_NAMES.PETUGAS) {
-    return ['ID Petugas', 'ID Warga Terkait', 'Nama Petugas', 'Blok Asal', 'Username Akun', 'Password', 'No WhatsApp', 'Blok Tugas', 'Blok Ditugaskan (JSON)', 'Peran'];
-  } else if (name === SHEET_NAMES.SETORAN) {
-    return ['ID Setoran', 'ID Petugas', 'Nama Petugas', 'Blok Tugas', 'Bulan', 'Tahun', 'Jumlah KK', 'Total Nominal (Rp)', 'Metode', 'Tanggal Setor', 'Status', 'Catatan', 'Tanggal Diterima', 'Diterima Oleh', 'Bukti Foto'];
-  }
-  return [];
-}
-
-function formatHeaderRow(sheet, colCount) {
-  if (colCount <= 0) return;
-  const headerRange = sheet.getRange(1, 1, 1, colCount);
-  headerRange.setBackground('#148878')
-    .setFontColor('#FFFFFF')
-    .setFontWeight('bold')
-    .setHorizontalAlignment('center');
-  sheet.setFrozenRows(1);
-}
-
-function ensureSheetHeadersOnly(sheet, name) {
-  const headers = getHeadersForSheet(name);
-  if (headers.length === 0) return;
-
-  const maxCols = sheet.getMaxColumns();
-  if (maxCols < headers.length) {
-    sheet.insertColumnsAfter(maxCols, headers.length - maxCols);
-  }
-  
-  if (sheet.getLastRow() === 0) {
-    sheet.appendRow(headers);
-    formatHeaderRow(sheet, headers.length);
-  } else {
-    const curCols = sheet.getLastColumn();
-    if (curCols < headers.length) {
-      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-      formatHeaderRow(sheet, headers.length);
-    }
-  }
-}
-
-function setupSheetHeaders(sheet, name) {
-  const headers = getHeadersForSheet(name);
-  if (headers.length > 0) {
-    sheet.clear();
-    sheet.appendRow(headers);
-    formatHeaderRow(sheet, headers.length);
-  }
-}
-
-/**
- * Tarik seluruh data dari Google Sheets ke format JSON RukunKu
- */
-function fetchAllDataFromSheets() {
-  const activeSS = SpreadsheetApp.getActiveSpreadsheet();
-
-  // 1. Pengaturan & Blok & Kategori
-  const settingsSheet = activeSS.getSheetByName(SHEET_NAMES.PENGATURAN);
-  const settings = {};
-  let blocks = null;
-  let categories = null;
-  let masjidSettings = null;
-  let masjidAdmin = null;
-  let masjidTransactions = null;
-  let masjidAssets = null;
-
-  if (settingsSheet && settingsSheet.getLastRow() > 1) {
-    const sRows = settingsSheet.getRange(2, 1, settingsSheet.getLastRow() - 1, 2).getValues();
-    sRows.forEach(row => {
-      if (row[0]) {
-        const key = String(row[0]).trim();
-        if (key === '_blocks_json') {
-          try { blocks = JSON.parse(row[1]); } catch(e){}
-        } else if (key === '_categories_json') {
-          try { categories = JSON.parse(row[1]); } catch(e){}
-        } else if (key === '_masjid_settings_json') {
-          try { masjidSettings = JSON.parse(row[1]); } catch(e){}
-        } else if (key === '_masjid_admin_json') {
-          try { masjidAdmin = JSON.parse(row[1]); } catch(e){}
-        } else if (key === '_masjid_transactions_json') {
-          try { masjidTransactions = JSON.parse(row[1]); } catch(e){}
-        } else if (key === '_masjid_assets_json') {
-          try { masjidAssets = JSON.parse(row[1]); } catch(e){}
-        } else {
-          let val = row[1];
-          if (typeof val === 'string' && !isNaN(val) && val.trim() !== '') {
-            val = Number(val);
-          }
-          settings[key] = val;
-        }
-      }
-    });
-  }
-
-  // 2. Data Warga
-  const residentsSheet = activeSS.getSheetByName(SHEET_NAMES.WARGA);
-  const residents = [];
-  if (residentsSheet && residentsSheet.getLastRow() > 1) {
-    const maxCols = Math.max(17, residentsSheet.getLastColumn());
-    const rRows = residentsSheet.getRange(2, 1, residentsSheet.getLastRow() - 1, maxCols).getValues();
-    rRows.forEach(row => {
-      if (row[0]) {
-        const id = String(row[0]).trim();
-        const nama = String(row[1] || '').trim();
-        const nik = String(row[2] || '').replace(/^'/, '').trim();
-        
-        let familyMembers = [];
-        if (row[15]) {
-          try { familyMembers = JSON.parse(row[15]); } catch(e) {}
-        }
-        if (!familyMembers || !Array.isArray(familyMembers) || familyMembers.length === 0) {
-          familyMembers = [
-            {
-              id: `${id}-fm-1`,
-              nama: nama,
-              hubungan: 'Kepala Keluarga',
-              nik: nik,
-              jenisKelamin: 'Laki-laki',
-              tanggalLahir: '',
-              punyaKtp: !!nik,
-              fotoKtp: ''
-            }
-          ];
-        }
-
-        const rawJumlah = parseInt(row[8], 10);
-        const finalJumlah = Math.max(isNaN(rawJumlah) ? 1 : rawJumlah, (familyMembers ? familyMembers.length : 1));
-
-        residents.push({
-          id: id,
-          nama: nama,
-          nik: nik,
-          noKk: String(row[3] || '').replace(/^'/, '').trim(),
-          blok: String(row[4] || '').trim(),
-          noRumah: String(row[5] || '').trim(),
-          alamat: String(row[6] || '').trim(),
-          phone: String(row[7] || '').replace(/^'/, '').trim(),
-          jumlahAnggota: finalJumlah,
-          statusHunian: String(row[9] || 'Pemilik Tetap'),
-          pekerjaan: String(row[10] || ''),
-          statusAktif: row[11] === true || String(row[11]).toLowerCase() === 'true',
-          tanggalMasuk: formatDate(row[12]),
-          avatarBg: String(row[13] || 'bg-pastel-teal'),
-          password: String(row[14] || '123456'),
-          familyMembers: familyMembers,
-          fotoKk: String(row[16] || '').trim()
-        });
-      }
-    });
-  }
-
-  // 3. Data Transaksi
-  const txSheet = activeSS.getSheetByName(SHEET_NAMES.TRANSAKSI);
-  const transactions = [];
-  if (txSheet && txSheet.getLastRow() > 1) {
-    const maxCols = Math.max(15, txSheet.getLastColumn());
-    const tRows = txSheet.getRange(2, 1, txSheet.getLastRow() - 1, maxCols).getValues();
-    tRows.forEach(row => {
-      if (row[0]) {
-        transactions.push({
-          id: String(row[0]),
-          tanggal: formatDate(row[1]),
-          waktu: String(row[2] || '10:00'),
-          tipe: String(row[3] || 'masuk').toLowerCase(),
-          kategori: String(row[4] || 'Iuran Bulanan'),
-          judul: String(row[5] || ''),
-          keterangan: String(row[6] || ''),
-          residentId: row[7] ? String(row[7]) : null,
-          blok: String(row[8] || ''),
-          nominal: Number(row[9] || 0),
-          metode: String(row[10] || 'Kas Tunai'),
-          status: String(row[11] || 'Approved'),
-          kwitansi: String(row[12] || ''),
-          pencatat: String(row[13] || ''),
-          buktiTransfer: String(row[14] || '').trim()
-        });
-      }
-    });
-  }
-
-  // 4. Matriks Iuran
-  const iuranSheet = activeSS.getSheetByName(SHEET_NAMES.IURAN);
-  const duesMatrix = {};
-  if (iuranSheet && iuranSheet.getLastRow() > 1) {
-    const iRows = iuranSheet.getRange(2, 1, iuranSheet.getLastRow() - 1, 15).getValues();
-    const year2026Map = {};
-    iRows.forEach(row => {
-      const resId = String(row[0]);
-      if (resId) {
-        duesMatrix[resId] = {};
-        year2026Map[resId] = {};
-        for (let m = 1; m <= 12; m++) {
-          const val = String(row[2 + m] || 'Belum');
-          duesMatrix[resId][m] = val;
-          year2026Map[resId][m] = val;
-        }
-      }
-    });
-    duesMatrix['2026'] = year2026Map;
-  }
-
-  // 5. Catatan Talangan
-  const talanganSheet = activeSS.getSheetByName(SHEET_NAMES.TALANGAN);
-  const talangan = [];
-  if (talanganSheet && talanganSheet.getLastRow() > 1) {
-    const tlRows = talanganSheet.getRange(2, 1, talanganSheet.getLastRow() - 1, 13).getValues();
-    tlRows.forEach(row => {
-      if (row[0]) {
-        talangan.push({
-          id: String(row[0]),
-          residentId: row[1] ? String(row[1]) : null,
-          namaPeminjam: String(row[2] || ''),
-          blok: String(row[3] || ''),
-          phone: String(row[4] || ''),
-          nominalTotal: Number(row[5] || 0),
-          terbayar: Number(row[6] || 0),
-          sisa: Number(row[7] || 0),
-          tanggalPinjam: formatDate(row[8]),
-          jatuhTempo: formatDate(row[9]),
-          keperluan: String(row[10] || ''),
-          status: String(row[11] || 'Belum Lunas'),
-          keterangan: String(row[12] || '')
-        });
-      }
-    });
-  }
-
-  // 6. Data Petugas Penagih Blok (DATABASE PETUGAS)
-  const colSheet = activeSS.getSheetByName(SHEET_NAMES.PETUGAS);
-  const collectors = [];
-  if (colSheet && colSheet.getLastRow() > 1) {
-    const colRows = colSheet.getRange(2, 1, colSheet.getLastRow() - 1, 10).getValues();
-    colRows.forEach(row => {
-      if (row[0]) {
-        let assigned = [];
-        try { assigned = JSON.parse(row[8]); } catch(e) { assigned = [String(row[7] || '')]; }
-        collectors.push({
-          id: String(row[0]),
-          residentId: String(row[1] || ''),
-          nama: String(row[2] || ''),
-          blokAsal: String(row[3] || ''),
-          username: String(row[4] || ''),
-          password: String(row[5] || '123'),
-          phone: String(row[6] || '').replace(/^'/, ''),
-          blokTugas: String(row[7] || ''),
-          assignedBlocks: Array.isArray(assigned) ? assigned : [String(row[7] || '')],
-          role: String(row[9] || 'petugas')
-        });
-      }
-    });
-  }
-
-  // 7. Data Setoran Kas Blok ke Bendahara (DATABASE SETORAN)
-  const setoranSheet = activeSS.getSheetByName(SHEET_NAMES.SETORAN);
-  const setoranBlok = [];
-  if (setoranSheet && setoranSheet.getLastRow() > 1) {
-    const setRows = setoranSheet.getRange(2, 1, setoranSheet.getLastRow() - 1, 15).getValues();
-    setRows.forEach(row => {
-      if (row[0]) {
-        setoranBlok.push({
-          id: String(row[0]),
-          collectorId: String(row[1] || ''),
-          collectorName: String(row[2] || ''),
-          blokTugas: String(row[3] || ''),
-          periodeBulan: Number(row[4] || 1),
-          periodeTahun: Number(row[5] || 2026),
-          jumlahKkTerbayar: Number(row[6] || 0),
-          nominalTotal: Number(row[7] || 0),
-          metode: String(row[8] || 'Tunai Fisik'),
-          tanggalSetor: formatDate(row[9]),
-          status: String(row[10] || 'Menunggu Konfirmasi'),
-          catatan: String(row[11] || ''),
-          tanggalDiterima: String(row[12] || ''),
-          diterimaOleh: String(row[13] || ''),
-          buktiFoto: String(row[14] || '')
-        });
-      }
-    });
-  }
-
-  return {
-    settings: Object.keys(settings).length > 0 ? settings : null,
-    blocks: blocks,
-    categories: categories,
-    residents: residents,
-    transactions: transactions,
-    duesMatrix: Object.keys(duesMatrix).length > 0 ? duesMatrix : null,
-    talangan: talangan,
-    collectors: collectors,
-    setoranBlok: setoranBlok,
-    masjidSettings: masjidSettings,
-    masjidAdmin: masjidAdmin,
-    masjidTransactions: masjidTransactions,
-    masjidAssets: masjidAssets
-  };
-}
-
-/**
- * Simpan seluruh data ke Sheets secara aman dengan penggabungan (Upsert Merge)
- * Tidak menghapus data warga atau transaksi lain yang sudah ada di sheet!
- */
-function saveAllDataToSheets(data) {
-  const activeSS = SpreadsheetApp.getActiveSpreadsheet();
-
-  // 1. Simpan Warga (Merge Cerdas: Update jika ada, Tambah jika belum ada)
-  if (data.residents && Array.isArray(data.residents)) {
-    const sheet = activeSS.getSheetByName(SHEET_NAMES.WARGA);
-    if (sheet) {
-      ensureSheetHeadersOnly(sheet, SHEET_NAMES.WARGA);
-      
-      const existingMap = new Map();
-      if (sheet.getLastRow() > 1) {
-        const existingData = sheet.getRange(2, 1, sheet.getLastRow() - 1, 17).getValues();
-        existingData.forEach(row => {
-          const id = String(row[0] || '').trim();
-          if (id) existingMap.set(id, row);
-        });
-      }
-
-      // Masukkan / update data dari payload
-      data.residents.forEach(r => {
-        const id = String(r.id || '').trim();
-        if (id) {
-          // Upload foto KK ke Drive jika masih Base64
-          let fotoKkUrl = r.fotoKk || '';
-          if (fotoKkUrl && fotoKkUrl.startsWith('data:image/')) {
-            const cleanNama = (r.nama || 'warga').replace(/[^a-zA-Z0-9]/g, '_');
-            fotoKkUrl = uploadBase64ToDrive(fotoKkUrl, 'KK_' + cleanNama + '_' + (r.noKk || r.id), 'Kartu Keluarga');
-            r.fotoKk = fotoKkUrl;
-          }
-
-          // Upload foto KTP setiap anggota keluarga ke Drive jika masih Base64
-          if (r.familyMembers && Array.isArray(r.familyMembers)) {
-            r.familyMembers.forEach((m, idx) => {
-              if (m.fotoKtp && m.fotoKtp.startsWith('data:image/')) {
-                const cleanMemberNama = (m.nama || ('anggota_' + idx)).replace(/[^a-zA-Z0-9]/g, '_');
-                const ktpUrl = uploadBase64ToDrive(m.fotoKtp, 'KTP_' + cleanMemberNama + '_' + (m.nik || m.id), 'Foto KTP');
-                m.fotoKtp = ktpUrl;
-              }
-            });
-          }
-
-          const row = [
-            id,
-            r.nama || '',
-            "'" + (r.nik || ''),
-            "'" + (r.noKk || ''),
-            r.blok || '',
-            r.noRumah || '',
-            r.alamat || '',
-            "'" + (r.phone || ''),
-            Math.max(Number(r.jumlahAnggota) || 1, (r.familyMembers ? r.familyMembers.length : 1)),
-            r.statusHunian || 'Pemilik Tetap',
-            r.pekerjaan || '',
-            r.statusAktif !== false,
-            r.tanggalMasuk || '',
-            r.avatarBg || 'bg-pastel-teal',
-            r.password || '123456',
-            JSON.stringify(r.familyMembers || []),
-            fotoKkUrl || ''
-          ];
-          existingMap.set(id, row);
-        }
-      });
-
-      const combinedRows = Array.from(existingMap.values());
-      if (combinedRows.length > 0) {
-        if (sheet.getLastRow() > 1) {
-          sheet.getRange(2, 1, sheet.getLastRow() - 1, 17).clearContent();
-        }
-        sheet.getRange(2, 1, combinedRows.length, 17).setValues(combinedRows);
-      }
-    }
-  }
-
-  // 2. Simpan Transaksi (Merge Berdasarkan ID Transaksi)
-  if (data.transactions && Array.isArray(data.transactions)) {
-    const sheet = activeSS.getSheetByName(SHEET_NAMES.TRANSAKSI);
-    if (sheet) {
-      ensureSheetHeadersOnly(sheet, SHEET_NAMES.TRANSAKSI);
-      
-      const txMap = new Map();
-      if (sheet.getLastRow() > 1) {
-        const maxCols = Math.max(15, sheet.getLastColumn());
-        const existingTx = sheet.getRange(2, 1, sheet.getLastRow() - 1, maxCols).getValues();
-        existingTx.forEach(row => {
-          const id = String(row[0] || '').trim();
-          if (id) txMap.set(id, row);
-        });
-      }
-
-      data.transactions.forEach(t => {
-        const id = String(t.id || '').trim();
-        if (id) {
-          let buktiTransferUrl = t.buktiTransfer || t.buktiFoto || '';
-          if (buktiTransferUrl && buktiTransferUrl.startsWith('data:image/')) {
-            const cleanJudul = (t.judul || 'tx').replace(/[^a-zA-Z0-9]/g, '_');
-            buktiTransferUrl = uploadBase64ToDrive(buktiTransferUrl, 'Bukti_Transfer_' + cleanJudul + '_' + id, 'Bukti Transfer Iuran');
-            t.buktiTransfer = buktiTransferUrl;
-            t.buktiFoto = buktiTransferUrl;
-          }
-
-          const row = [
-            id,
-            t.tanggal || '',
-            t.waktu || '10:00',
-            t.tipe || 'masuk',
-            t.kategori || 'Iuran Bulanan',
-            t.judul || '',
-            t.keterangan || '',
-            t.residentId || '',
-            t.blok || '',
-            t.nominal || 0,
-            t.metode || 'Kas Tunai',
-            t.status || 'Approved',
-            t.kwitansi || '',
-            t.pencatat || '',
-            buktiTransferUrl || ''
-          ];
-          txMap.set(id, row);
-        }
-      });
-
-      const combinedTx = Array.from(txMap.values());
-      if (combinedTx.length > 0) {
-        if (sheet.getLastRow() > 1) {
-          sheet.getRange(2, 1, sheet.getLastRow() - 1, 15).clearContent();
-        }
-        sheet.getRange(2, 1, combinedTx.length, 15).setValues(combinedTx);
-      }
-    }
-  }
-
-  // 3. Simpan Matriks Iuran
-  if (data.duesMatrix && data.residents) {
-    const sheet = activeSS.getSheetByName(SHEET_NAMES.IURAN);
-    if (sheet) {
-      ensureSheetHeadersOnly(sheet, SHEET_NAMES.IURAN);
-      const rows = [];
-      data.residents.forEach(r => {
-        const matrix = (data.duesMatrix['2026'] && data.duesMatrix['2026'][r.id]) || data.duesMatrix[r.id] || {};
-        const row = [r.id, r.nama, (r.blok || '') + '/' + (r.noRumah || '')];
-        for (let m = 1; m <= 12; m++) {
-          row.push(matrix[m] || 'Belum');
-        }
-        rows.push(row);
-      });
-      if (rows.length > 0) {
-        if (sheet.getLastRow() > 1) {
-          sheet.getRange(2, 1, sheet.getLastRow() - 1, 15).clearContent();
-        }
-        sheet.getRange(2, 1, rows.length, 15).setValues(rows);
-      }
-    }
-  }
-
-  // 4. Simpan Talangan
-  if (data.talangan && Array.isArray(data.talangan)) {
-    const sheet = activeSS.getSheetByName(SHEET_NAMES.TALANGAN);
-    if (sheet) {
-      ensureSheetHeadersOnly(sheet, SHEET_NAMES.TALANGAN);
-      const rows = data.talangan.map(tl => [
-        tl.id,
-        tl.residentId || '',
-        tl.namaPeminjam || '',
-        tl.blok || '',
-        "'" + (tl.phone || ''),
-        tl.nominalTotal || 0,
-        tl.terbayar || 0,
-        tl.sisa || 0,
-        tl.tanggalPinjam || '',
-        tl.jatuhTempo || '',
-        tl.keperluan || '',
-        tl.status || 'Belum Lunas',
-        tl.keterangan || ''
-      ]);
-      if (rows.length > 0) {
-        if (sheet.getLastRow() > 1) {
-          sheet.getRange(2, 1, sheet.getLastRow() - 1, 13).clearContent();
-        }
-        sheet.getRange(2, 1, rows.length, 13).setValues(rows);
-      }
-    }
-  }
-
-  // 5. Simpan Petugas Penagih Blok (Sheet Petugas)
-  if (data.collectors && Array.isArray(data.collectors)) {
-    const sheet = activeSS.getSheetByName(SHEET_NAMES.PETUGAS);
-    if (sheet) {
-      ensureSheetHeadersOnly(sheet, SHEET_NAMES.PETUGAS);
-      const rows = data.collectors.map(c => [
-        c.id,
-        c.residentId || '',
-        c.nama || '',
-        c.blokAsal || '',
-        c.username || '',
-        c.password || '123',
-        "'" + (c.phone || ''),
-        c.blokTugas || '',
-        JSON.stringify(c.assignedBlocks || []),
-        c.role || 'petugas'
-      ]);
-      if (rows.length > 0) {
-        if (sheet.getLastRow() > 1) {
-          sheet.getRange(2, 1, sheet.getLastRow() - 1, 10).clearContent();
-        }
-        sheet.getRange(2, 1, rows.length, 10).setValues(rows);
-      }
-    }
-  }
-
-  // 6. Simpan Setoran Kas Blok (Sheet Setoran)
-  if (data.setoranBlok && Array.isArray(data.setoranBlok)) {
-    const sheet = activeSS.getSheetByName(SHEET_NAMES.SETORAN);
-    if (sheet) {
-      ensureSheetHeadersOnly(sheet, SHEET_NAMES.SETORAN);
-      const rows = data.setoranBlok.map(s => [
-        s.id,
-        s.collectorId || '',
-        s.collectorName || '',
-        s.blokTugas || '',
-        Number(s.periodeBulan || 1),
-        Number(s.periodeTahun || 2026),
-        Number(s.jumlahKkTerbayar || 0),
-        Number(s.nominalTotal || 0),
-        s.metode || 'Tunai Fisik',
-        s.tanggalSetor || '',
-        s.status || 'Menunggu Konfirmasi',
-        s.catatan || '',
-        s.tanggalDiterima || '',
-        s.diterimaOleh || '',
-        s.buktiFoto || ''
-      ]);
-      if (rows.length > 0) {
-        if (sheet.getLastRow() > 1) {
-          sheet.getRange(2, 1, sheet.getLastRow() - 1, 15).clearContent();
-        }
-        sheet.getRange(2, 1, rows.length, 15).setValues(rows);
-      }
-    }
-  }
-
-  // 7. Simpan Pengaturan & Blok & Kategori & Data Masjid
-  if (data.settings || data.masjidSettings) {
-    const sheet = activeSS.getSheetByName(SHEET_NAMES.PENGATURAN);
-    if (sheet) {
-      ensureSheetHeadersOnly(sheet, SHEET_NAMES.PENGATURAN);
-      const rows = [];
-      if (data.settings) {
-        Object.keys(data.settings).forEach(k => {
-          rows.push([k, data.settings[k]]);
-        });
-      }
-      if (data.blocks && Array.isArray(data.blocks)) {
-        rows.push(['_blocks_json', JSON.stringify(data.blocks)]);
-      }
-      if (data.categories) {
-        rows.push(['_categories_json', JSON.stringify(data.categories)]);
-      }
-      if (data.masjidSettings) {
-        rows.push(['_masjid_settings_json', JSON.stringify(data.masjidSettings)]);
-      }
-      if (data.masjidAdmin) {
-        rows.push(['_masjid_admin_json', JSON.stringify(data.masjidAdmin)]);
-      }
-      if (data.masjidTransactions && Array.isArray(data.masjidTransactions)) {
-        rows.push(['_masjid_transactions_json', JSON.stringify(data.masjidTransactions)]);
-      }
-      if (data.masjidAssets && Array.isArray(data.masjidAssets)) {
-        rows.push(['_masjid_assets_json', JSON.stringify(data.masjidAssets)]);
-      }
-      if (rows.length > 0) {
-        if (sheet.getLastRow() > 1) {
-          sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).clearContent();
-        }
-        sheet.getRange(2, 1, rows.length, 2).setValues(rows);
-      }
-    }
-  }
-}
-
-/**
- * Tambah / Update baris transaksi kas langsung ke Google Sheets (Upsert)
- */
-function addTransactionRow(tx) {
-  const activeSS = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = activeSS.getSheetByName(SHEET_NAMES.TRANSAKSI);
-  if (!sheet) return;
-  ensureSheetHeadersOnly(sheet, SHEET_NAMES.TRANSAKSI);
-
-  const rowData = [
-    tx.id,
-    tx.tanggal || '',
-    tx.waktu || '10:00',
-    tx.tipe || 'masuk',
-    tx.kategori || 'Iuran Bulanan',
-    tx.judul || '',
-    tx.keterangan || '',
-    tx.residentId || '',
-    tx.blok || '',
-    tx.nominal || 0,
-    tx.metode || 'Kas Tunai',
-    tx.status || 'Approved',
-    tx.kwitansi || '',
-    tx.pencatat || '',
-    tx.buktiTransfer || tx.buktiFoto || ''
-  ];
-
-  const lastRow = sheet.getLastRow();
-  let foundRow = -1;
-  if (lastRow > 1) {
-    const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
-    for (let i = 0; i < ids.length; i++) {
-      if (String(ids[i][0]).trim() === String(tx.id).trim()) {
-        foundRow = i + 2;
-        break;
-      }
-    }
-  }
-
-  if (foundRow > 1) {
-    sheet.getRange(foundRow, 1, 1, rowData.length).setValues([rowData]);
-  } else {
-    sheet.appendRow(rowData);
-  }
-}
-
-/**
- * Tambah / Update data warga langsung (Upsert)
- */
-function upsertResidentRow(resident) {
-  const activeSS = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = activeSS.getSheetByName(SHEET_NAMES.WARGA);
-  if (!sheet) return;
-  ensureSheetHeadersOnly(sheet, SHEET_NAMES.WARGA);
-  
-  // 1. Upload foto KK ke Drive jika masih Base64
-  let fotoKkUrl = resident.fotoKk || '';
-  if (fotoKkUrl && fotoKkUrl.startsWith('data:image/')) {
-    const cleanNama = (resident.nama || 'warga').replace(/[^a-zA-Z0-9]/g, '_');
-    fotoKkUrl = uploadBase64ToDrive(fotoKkUrl, 'KK_' + cleanNama + '_' + (resident.noKk || resident.id), 'Kartu Keluarga');
-    resident.fotoKk = fotoKkUrl;
-  }
-
-  // 2. Upload foto KTP setiap anggota keluarga ke Drive jika masih Base64
-  if (resident.familyMembers && Array.isArray(resident.familyMembers)) {
-    resident.familyMembers.forEach((m, idx) => {
-      if (m.fotoKtp && m.fotoKtp.startsWith('data:image/')) {
-        const cleanMemberNama = (m.nama || ('anggota_' + idx)).replace(/[^a-zA-Z0-9]/g, '_');
-        const ktpUrl = uploadBase64ToDrive(m.fotoKtp, 'KTP_' + cleanMemberNama + '_' + (m.nik || m.id), 'Foto KTP');
-        m.fotoKtp = ktpUrl;
-      }
-    });
-  }
-
-  const lastRow = sheet.getLastRow();
-  let foundRow = -1;
-  if (lastRow > 1) {
-    const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
-    for (let i = 0; i < ids.length; i++) {
-      if (String(ids[i][0]).trim() === String(resident.id).trim()) {
-        foundRow = i + 2;
-        break;
-      }
-    }
-  }
-
-  const row = [
-    resident.id,
-    resident.nama || '',
-    "'" + (resident.nik || ''),
-    "'" + (resident.noKk || ''),
-    resident.blok || '',
-    resident.noRumah || '',
-    resident.alamat || '',
-    "'" + (resident.phone || ''),
-    Math.max(Number(resident.jumlahAnggota) || 1, (resident.familyMembers ? resident.familyMembers.length : 1)),
-    resident.statusHunian || 'Pemilik Tetap',
-    resident.pekerjaan || '',
-    resident.statusAktif !== false,
-    resident.tanggalMasuk || '',
-    resident.avatarBg || 'bg-pastel-teal',
-    resident.password || '123456',
-    JSON.stringify(resident.familyMembers || []),
-    fotoKkUrl || ''
-  ];
-
-  if (foundRow > 1) {
-    sheet.getRange(foundRow, 1, 1, row.length).setValues([row]);
-  } else {
-    sheet.appendRow(row);
-  }
-
-  return resident;
-}
-
-/**
- * Hapus warga langsung dari sheet Warga
- */
-function deleteResidentRow(residentId) {
-  const activeSS = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = activeSS.getSheetByName(SHEET_NAMES.WARGA);
-  if (!sheet) return;
-  const lastRow = sheet.getLastRow();
-  if (lastRow <= 1) return;
-  const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
-  for (let i = ids.length - 1; i >= 0; i--) {
-    if (String(ids[i][0]).trim() === String(residentId).trim()) {
-      sheet.deleteRow(i + 2);
-      break;
-    }
-  }
-}
-
-/**
- * Tambah / Update data petugas penagih langsung
- */
-function upsertCollectorRow(col) {
-  const activeSS = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = activeSS.getSheetByName(SHEET_NAMES.PETUGAS);
-  if (!sheet) return;
-  ensureSheetHeadersOnly(sheet, SHEET_NAMES.PETUGAS);
-
-  const lastRow = sheet.getLastRow();
-  let foundRow = -1;
-  if (lastRow > 1) {
-    const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
-    for (let i = 0; i < ids.length; i++) {
-      if (String(ids[i][0]).trim() === String(col.id).trim()) {
-        foundRow = i + 2;
-        break;
-      }
-    }
-  }
-
-  const row = [
-    col.id,
-    col.residentId || '',
-    col.nama || '',
-    col.blokAsal || '',
-    col.username || '',
-    col.password || '123',
-    "'" + (col.phone || ''),
-    col.blokTugas || '',
-    JSON.stringify(col.assignedBlocks || []),
-    col.role || 'petugas'
-  ];
-
-  if (foundRow > 1) {
-    sheet.getRange(foundRow, 1, 1, row.length).setValues([row]);
-  } else {
-    sheet.appendRow(row);
-  }
-
-  return resident;
-}
-
-function deleteCollectorRow(collectorId) {
-  const activeSS = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = activeSS.getSheetByName(SHEET_NAMES.PETUGAS);
-  if (!sheet) return;
-  const lastRow = sheet.getLastRow();
-  if (lastRow <= 1) return;
-  const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
-  for (let i = ids.length - 1; i >= 0; i--) {
-    if (String(ids[i][0]).trim() === String(collectorId).trim()) {
-      sheet.deleteRow(i + 2);
-      break;
-    }
-  }
-}
-
-/**
- * Tambah / Update setoran kas blok langsung
- */
-function upsertSetoranRow(s) {
-  const activeSS = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = activeSS.getSheetByName(SHEET_NAMES.SETORAN);
-  if (!sheet) return;
-  ensureSheetHeadersOnly(sheet, SHEET_NAMES.SETORAN);
-
-  // Upload foto bukti setoran jika masih Base64
-  let buktiFotoUrl = s.buktiFoto || '';
-  if (buktiFotoUrl && buktiFotoUrl.startsWith('data:image/')) {
-    const cleanCollector = (s.collectorName || 'petugas').replace(/[^a-zA-Z0-9]/g, '_');
-    buktiFotoUrl = uploadBase64ToDrive(buktiFotoUrl, 'Setoran_' + cleanCollector + '_' + s.id, 'Bukti Setoran Kas');
-    s.buktiFoto = buktiFotoUrl;
-  }
-
-  const lastRow = sheet.getLastRow();
-  let foundRow = -1;
-  if (lastRow > 1) {
-    const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
-    for (let i = 0; i < ids.length; i++) {
-      if (String(ids[i][0]).trim() === String(s.id).trim()) {
-        foundRow = i + 2;
-        break;
-      }
-    }
-  }
-
-  const row = [
-    s.id,
-    s.collectorId || '',
-    s.collectorName || '',
-    s.blokTugas || '',
-    Number(s.periodeBulan || 1),
-    Number(s.periodeTahun || 2026),
-    Number(s.jumlahKkTerbayar || 0),
-    Number(s.nominalTotal || 0),
-    s.metode || 'Tunai Fisik',
-    s.tanggalSetor || '',
-    s.status || 'Menunggu Konfirmasi',
-    s.catatan || '',
-    s.tanggalDiterima || '',
-    s.diterimaOleh || '',
-    buktiFotoUrl || ''
-  ];
-
-  if (foundRow > 1) {
-    sheet.getRange(foundRow, 1, 1, row.length).setValues([row]);
-  } else {
-    sheet.appendRow(row);
-  }
-
-  return resident;
-}
-
-/**
- * Update checklist iuran per warga per bulan
- */
-function updateDuesStatus(residentId, month, status) {
-  const activeSS = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = activeSS.getSheetByName(SHEET_NAMES.IURAN);
-  if (!sheet) return;
-  const lastRow = sheet.getLastRow();
-  if (lastRow <= 1) return;
-  const colIndex = 3 + parseInt(month); // Jan = Col 4
-  const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
-  for (let i = 0; i < ids.length; i++) {
-    if (String(ids[i][0]).trim() === String(residentId).trim()) {
-      sheet.getRange(i + 2, colIndex).setValue(status);
-      break;
-    }
-  }
-}
-
-/**
- * Tambah / Update catatan talangan
- */
-function upsertTalanganRow(talangan) {
-  const activeSS = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = activeSS.getSheetByName(SHEET_NAMES.TALANGAN);
-  if (!sheet) return;
-  ensureSheetHeadersOnly(sheet, SHEET_NAMES.TALANGAN);
-  const row = [
-    talangan.id,
-    talangan.residentId || '',
-    talangan.namaPeminjam || '',
-    talangan.blok || '',
-    "'" + (talangan.phone || ''),
-    talangan.nominalTotal || 0,
-    talangan.terbayar || 0,
-    talangan.sisa || 0,
-    talangan.tanggalPinjam || '',
-    talangan.jatuhTempo || '',
-    talangan.keperluan || '',
-    talangan.status || 'Belum Lunas',
-    talangan.keterangan || ''
-  ];
-  const lastRow = sheet.getLastRow();
-  let foundRow = -1;
-  if (lastRow > 1) {
-    const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
-    for (let i = 0; i < ids.length; i++) {
-      if (String(ids[i][0]).trim() === String(talangan.id).trim()) {
-        foundRow = i + 2;
-        break;
-      }
-    }
-  }
-  if (foundRow > 1) {
-    sheet.getRange(foundRow, 1, 1, row.length).setValues([row]);
-  } else {
-    sheet.appendRow(row);
-  }
-
-  return resident;
-}
-
-function formatDate(val) {
-  if (!val) return '';
-  if (val instanceof Date) {
-    return Utilities.formatDate(val, Session.getScriptTimeZone(), 'yyyy-MM-dd');
-  }
-  return String(val);
-}
-
-function initializeAllSheets() {
-  ensureSheetsExist();
-  try {
-    const mainFolder = getOrCreateDriveFolder("RukunKu - Dokumen Warga");
-    getOrCreateSubFolder(mainFolder, "Kartu Keluarga");
-    getOrCreateSubFolder(mainFolder, "Foto KTP");
-    getOrCreateSubFolder(mainFolder, "Bukti Setoran Kas");
-    getOrCreateSubFolder(mainFolder, "Bukti Transfer Iuran");
-  } catch(e) {
-    Logger.log("Peringatan Drive: " + e);
-  }
-  return "Inisialisasi 7 sheet RukunKu & Google Drive selesai.";
-}
-
-/**
- * Jalankan fungsi ini 1 kali di editor Google Apps Script untuk otorisasi Google Drive
- */
-function testDriveAuthorization() {
-  const mainFolder = getOrCreateDriveFolder("RukunKu - Dokumen Warga");
-  getOrCreateSubFolder(mainFolder, "Kartu Keluarga");
-  getOrCreateSubFolder(mainFolder, "Foto KTP");
-  getOrCreateSubFolder(mainFolder, "Bukti Setoran Kas");
-  getOrCreateSubFolder(mainFolder, "Bukti Transfer Iuran");
-  Logger.log("✅ Otorisasi Google Drive Aktif! Folder: " + mainFolder.getName());
-  return "Otorisasi Google Drive Berhasil!";
-}
-
-// ============================================================================
-// GOOGLE DRIVE INTEGRATION (Penyimpanan Berkas Foto KTP, KK, & Bukti Setoran)
-// ============================================================================
-
-/**
- * Menyimpan data Base64 gambar ke folder Google Drive secara otomatis
- * Mengembalikan URL gambar langsung yang dapat dibuka & dipratinjau di webapp
- */
-function uploadBase64ToDrive(base64Str, fileName, subFolderName) {
-  if (!base64Str || typeof base64Str !== 'string') return '';
-  base64Str = base64Str.trim();
-  
-  // Jika sudah berupa link URL (misal Google Drive link, Cloudinary, atau Web URL), langsung gunakan
-  if (base64Str.startsWith('http://') || base64Str.startsWith('https://')) {
-    return base64Str;
-  }
-  
-  // Hanya proses jika berformat Data URL Base64
-  if (!base64Str.startsWith('data:image/')) {
-    return '';
-  }
-
-  try {
-    const mainFolderName = "RukunKu - Dokumen Warga";
-    const mainFolder = getOrCreateDriveFolder(mainFolderName);
-    let targetFolder = mainFolder;
-    if (subFolderName) {
-      targetFolder = getOrCreateSubFolder(mainFolder, subFolderName);
-    }
-
-    const matches = base64Str.match(/^data:([^;]+);base64,([\s\S]+)$/);
-    if (!matches || matches.length !== 3) {
-      Logger.log("Format data base64 tidak cocok");
-      return '';
-    }
-
-    const contentType = matches[1];
-    const base64Data = matches[2].replace(/\s+/g, '');
-    const decodedBytes = Utilities.base64Decode(base64Data);
-    
-    // Tentukan ekstensi file
-    let ext = 'jpg';
-    if (contentType.includes('png')) ext = 'png';
-    else if (contentType.includes('webp')) ext = 'webp';
-
-    const fullFileName = (fileName || ('dokumen_' + Date.now())) + '.' + ext;
-    const blob = Utilities.newBlob(decodedBytes, contentType, fullFileName);
-    const file = targetFolder.createFile(blob);
-
-    // Buka akses file agar dapat dipratinjau di webapp RukunKu
-    try {
-      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    } catch(e) {
-      Logger.log("Warning sharing: " + e);
-    }
-
-    // Mengembalikan URL view langsung berkecepatan tinggi dari Google CDN
-    return 'https://lh3.googleusercontent.com/d/' + file.getId();
-  } catch (err) {
-    Logger.log("Gagal upload file ke Google Drive: " + err);
-    return '';
-  }
-}
-
-function getOrCreateDriveFolder(folderName) {
-  const folders = DriveApp.getFoldersByName(folderName);
-  if (folders.hasNext()) {
-    return folders.next();
-  }
-  return DriveApp.createFolder(folderName);
-}
-
-function getOrCreateSubFolder(parentFolder, subFolderName) {
-  const subFolders = parentFolder.getFoldersByName(subFolderName);
-  if (subFolders.hasNext()) {
-    return subFolders.next();
-  }
-  return parentFolder.createFolder(subFolderName);
 }
