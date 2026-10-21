@@ -318,6 +318,10 @@ function fetchAllDataFromSheets() {
   const settings = {};
   let blocks = null;
   let categories = null;
+  let masjidSettings = null;
+  let masjidAdmin = null;
+  let masjidTransactions = null;
+  let masjidAssets = null;
 
   if (settingsSheet && settingsSheet.getLastRow() > 1) {
     const sRows = settingsSheet.getRange(2, 1, settingsSheet.getLastRow() - 1, 2).getValues();
@@ -328,6 +332,14 @@ function fetchAllDataFromSheets() {
           try { blocks = JSON.parse(row[1]); } catch(e){}
         } else if (key === '_categories_json') {
           try { categories = JSON.parse(row[1]); } catch(e){}
+        } else if (key === '_masjid_settings_json') {
+          try { masjidSettings = JSON.parse(row[1]); } catch(e){}
+        } else if (key === '_masjid_admin_json') {
+          try { masjidAdmin = JSON.parse(row[1]); } catch(e){}
+        } else if (key === '_masjid_transactions_json') {
+          try { masjidTransactions = JSON.parse(row[1]); } catch(e){}
+        } else if (key === '_masjid_assets_json') {
+          try { masjidAssets = JSON.parse(row[1]); } catch(e){}
         } else {
           let val = row[1];
           if (typeof val === 'string' && !isNaN(val) && val.trim() !== '') {
@@ -534,7 +546,11 @@ function fetchAllDataFromSheets() {
     duesMatrix: Object.keys(duesMatrix).length > 0 ? duesMatrix : null,
     talangan: talangan,
     collectors: collectors,
-    setoranBlok: setoranBlok
+    setoranBlok: setoranBlok,
+    masjidSettings: masjidSettings,
+    masjidAdmin: masjidAdmin,
+    masjidTransactions: masjidTransactions,
+    masjidAssets: masjidAssets
   };
 }
 
@@ -783,20 +799,34 @@ function saveAllDataToSheets(data) {
     }
   }
 
-  // 7. Simpan Pengaturan & Blok & Kategori
-  if (data.settings) {
+  // 7. Simpan Pengaturan & Blok & Kategori & Data Masjid
+  if (data.settings || data.masjidSettings) {
     const sheet = activeSS.getSheetByName(SHEET_NAMES.PENGATURAN);
     if (sheet) {
       ensureSheetHeadersOnly(sheet, SHEET_NAMES.PENGATURAN);
       const rows = [];
-      Object.keys(data.settings).forEach(k => {
-        rows.push([k, data.settings[k]]);
-      });
+      if (data.settings) {
+        Object.keys(data.settings).forEach(k => {
+          rows.push([k, data.settings[k]]);
+        });
+      }
       if (data.blocks && Array.isArray(data.blocks)) {
         rows.push(['_blocks_json', JSON.stringify(data.blocks)]);
       }
       if (data.categories) {
         rows.push(['_categories_json', JSON.stringify(data.categories)]);
+      }
+      if (data.masjidSettings) {
+        rows.push(['_masjid_settings_json', JSON.stringify(data.masjidSettings)]);
+      }
+      if (data.masjidAdmin) {
+        rows.push(['_masjid_admin_json', JSON.stringify(data.masjidAdmin)]);
+      }
+      if (data.masjidTransactions && Array.isArray(data.masjidTransactions)) {
+        rows.push(['_masjid_transactions_json', JSON.stringify(data.masjidTransactions)]);
+      }
+      if (data.masjidAssets && Array.isArray(data.masjidAssets)) {
+        rows.push(['_masjid_assets_json', JSON.stringify(data.masjidAssets)]);
       }
       if (rows.length > 0) {
         if (sheet.getLastRow() > 1) {
