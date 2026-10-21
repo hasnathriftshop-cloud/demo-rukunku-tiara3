@@ -631,7 +631,7 @@ const DB = {
                 }
               ];
             }
-            r.jumlahAnggota = r.familyMembers.length;
+            r.jumlahAnggota = Math.max(Number(r.jumlahAnggota) || 1, (r.familyMembers ? r.familyMembers.length : 1));
           });
         }
 
