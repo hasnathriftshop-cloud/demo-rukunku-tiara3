@@ -223,11 +223,25 @@ const CloudSync = {
                 };
               });
 
+              // Pertahankan daftar anggota keluarga lokal jika lokal memiliki data lebih lengkap/baru
+              let finalFamily = mergedFamily.length > 0 ? mergedFamily : (cr.familyMembers || []);
+              if (localMatch && Array.isArray(localMatch.familyMembers) && localMatch.familyMembers.length > finalFamily.length) {
+                finalFamily = localMatch.familyMembers;
+              }
+
+              // Pastikan jumlahAnggota tidak turun kembali menjadi 1 jika di lokal atau cloud ada angka lebih besar
+              const safeJumlah = Math.max(
+                Number(cr.jumlahAnggota) || 1,
+                Number(localMatch ? localMatch.jumlahAnggota : 1) || 1,
+                finalFamily.length || 1
+              );
+
               return {
                 ...cr,
+                jumlahAnggota: safeJumlah,
                 password: cr.password || (localMatch && localMatch.password ? localMatch.password : '123456'),
                 fotoKk: cr.fotoKk || (localMatch && localMatch.fotoKk ? localMatch.fotoKk : ''),
-                familyMembers: mergedFamily.length > 0 ? mergedFamily : (cr.familyMembers || (localMatch ? localMatch.familyMembers : []))
+                familyMembers: finalFamily
               };
             })
           : (currentLocal.residents || []);
@@ -394,7 +408,16 @@ const CloudSync = {
           const currentLocal = DB.load();
           const rIdx = (currentLocal.residents || []).findIndex(r => r.id === json.resident.id);
           if (rIdx !== -1) {
-            currentLocal.residents[rIdx] = { ...currentLocal.residents[rIdx], ...json.resident };
+            const preservedJumlah = Math.max(
+              Number(currentLocal.residents[rIdx].jumlahAnggota) || 1,
+              Number(json.resident.jumlahAnggota) || 1,
+              (json.resident.familyMembers ? json.resident.familyMembers.length : 1)
+            );
+            currentLocal.residents[rIdx] = {
+              ...currentLocal.residents[rIdx],
+              ...json.resident,
+              jumlahAnggota: preservedJumlah
+            };
             DB.save(currentLocal, { skipSync: true });
             if (window.App) {
               window.App.data = currentLocal;
