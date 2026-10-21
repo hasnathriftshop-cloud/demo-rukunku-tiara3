@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
   <!-- Custom Modern Stylesheet -->
-  <link rel="stylesheet" href="css/style.css?v=20261021_07">
+  <link rel="stylesheet" href="css/style.css?v=20261021_08">
 </head>
 <body>
 
@@ -1446,12 +1446,19 @@
           <div style="font-size: 12px; color: #64748b; margin-top: 6px;">Nominal Iuran Wajib: <strong id="displayIuranWajibModal">Rp 150.000 / bulan</strong></div>
         </div>
 
+        <div style="background: #f0fdfa; border: 1px solid #ccfbf1; border-radius: 10px; padding: 10px 14px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 12px; color: #0d9488; font-weight: 600;">Periode Iuran:</span>
+          <strong style="font-size: 13.5px; color: #0f766e;" id="wargaKonfirmasiPeriodeInfo">Bulan Berjalan</strong>
+        </div>
+        <input type="hidden" id="wargaKonfirmasiTahun" value="">
+        <input type="hidden" id="wargaKonfirmasiBulan" value="">
+
         <div class="form-group" style="margin-top: 10px;">
           <label class="form-label">Metode Yang Digunakan</label>
           <select id="wargaKonfirmasiMetode" class="form-control">
-            <option>Transfer Bank BCA</option>
-            <option>QRIS RT</option>
-            <option>Titip Tunai ke Bendahara</option>
+            <option value="Transfer Bank BCA">Transfer Bank BCA</option>
+            <option value="QRIS RT">QRIS RT</option>
+            <option value="Titip Tunai ke Bendahara">Titip Tunai ke Bendahara</option>
           </select>
         </div>
 
@@ -1462,10 +1469,7 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn-outline-pill btn-close-modal">Batal</button>
-        <button type="button" class="btn-teal-pill" onclick="
-          alert('Konfirmasi pembayaran telah terkirim! Status iuran Anda akan diverifikasi oleh Bendahara RT.');
-          App.closeModal('modalKonfirmasiWarga');
-        ">Kirim Konfirmasi</button>
+        <button type="button" class="btn-teal-pill" onclick="App.submitKonfirmasiWarga()">Kirim Konfirmasi</button>
       </div>
     </div>
   </div>
@@ -1916,10 +1920,10 @@
   </div>
 
   <!-- Scripts with cache-busting -->
-  <script src="js/data.js?v=20261021_07"></script>
-  <script src="js/cloud-sync.js?v=20261021_07"></script>
-  <script src="js/report-pdf.js?v=20261021_07"></script>
-  <script src="js/app.js?v=20261021_07"></script>
+  <script src="js/data.js?v=20261021_08"></script>
+  <script src="js/cloud-sync.js?v=20261021_08"></script>
+  <script src="js/report-pdf.js?v=20261021_08"></script>
+  <script src="js/app.js?v=20261021_08"></script>
 
   <script>
     // Set default date picker values to today (bulletproof ready check)
