@@ -2513,83 +2513,134 @@
        MODAL: PENGATURAN DATABASE GOOGLE SHEETS & CLOUD SYNC (DUAL-DATABASE)
        ======================================================================== -->
   <div class="modal-overlay" id="modalCloudSync">
-    <div class="modal-card" style="max-width: 640px;">
+    <div class="modal-card" style="max-width: 660px;">
       <div class="modal-header">
         <h3 class="modal-title" id="modalCloudTitle" style="display: flex; align-items: center; gap: 8px;">
-          <span>📊 Cloud Database Google Sheets</span>
+          <span>⚡ Pengaturan Cloud Database RukunKu</span>
         </h3>
         <button class="btn-close-modal">&times;</button>
       </div>
       <div class="modal-body">
         
-        <!-- Scope Switcher Tabs: RT vs Masjid -->
-        <div style="display: flex; gap: 8px; margin-bottom: 14px; background: #f1f5f9; padding: 4px; border-radius: 12px;">
-          <button type="button" id="btnCloudScopeRt" class="btn-scope-tab active" onclick="CloudSync.switchScopeUI('rt')" style="flex: 1; padding: 8px 12px; border-radius: 9px; font-size: 12.5px; font-weight: 600; cursor: pointer; transition: all 0.2s; border: 1px solid #0f766e; background: #0f766e; color: #ffffff; display: flex; align-items: center; justify-content: center; gap: 6px;">
-            <span>🏢 Database Lingkungan RT</span>
+        <!-- Switcher Tab Antar Provider: Supabase SQL vs Google Sheets -->
+        <div style="display: flex; gap: 8px; margin-bottom: 14px; background: #e2e8f0; padding: 4px; border-radius: 12px;">
+          <button type="button" id="btnDbProviderSupabase" class="btn-scope-tab active" onclick="SupabaseSync.switchProviderTab('supabase')" style="flex: 1; padding: 9px 12px; border-radius: 9px; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.2s; border: none; background: #0f766e; color: #ffffff; display: flex; align-items: center; justify-content: center; gap: 6px;">
+            <span>⚡ Supabase Cloud SQL (Utama &amp; Cepat)</span>
           </button>
-          <button type="button" id="btnCloudScopeMasjid" class="btn-scope-tab" onclick="CloudSync.switchScopeUI('masjid')" style="flex: 1; padding: 8px 12px; border-radius: 9px; font-size: 12.5px; font-weight: 600; cursor: pointer; transition: all 0.2s; border: 1px solid #cbd5e1; background: #ffffff; color: #64748b; display: flex; align-items: center; justify-content: center; gap: 6px;">
-            <span>🕌 Database Masjid Sabilillah</span>
-          </button>
-        </div>
-
-        <!-- Status Box -->
-        <div id="modalCloudStatus" style="margin-bottom: 12px;"></div>
-        
-        <!-- Scope Description -->
-        <p id="modalCloudScopeDesc" style="font-size: 12.5px; color: #475569; line-height: 1.5; margin-bottom: 12px;">
-          Hubungkan RukunKu ke Google Sheets menggunakan <strong>Google Apps Script</strong> gratis. Data warga, kas, dan iuran akan tersimpan otomatis di Google Drive Anda.
-        </p>
-
-        <div class="form-group" style="margin-top: 10px;">
-          <label class="form-label" style="display: flex; justify-content: space-between;">
-            <span>URL Web App Google Apps Script *</span>
-            <span id="cloudLastSyncText" style="font-size: 11px; color: #64748b; font-weight: normal;"></span>
-          </label>
-          <input type="url" id="inputGasUrl" class="form-control" placeholder="https://script.google.com/macros/s/.../exec" style="font-family: monospace; font-size: 12px;">
-        </div>
-
-        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px;">
-          <button type="button" class="btn-teal-pill" style="font-size: 12px; padding: 7px 14px;" onclick="
-            const val = document.getElementById('inputGasUrl').value.trim();
-            CloudSync.testConnection(val);
-          ">
-            ⚡ Tes Koneksi
-          </button>
-          <button type="button" class="btn-outline-pill" style="font-size: 12px; padding: 7px 14px;" onclick="CloudSync.pullFromSheets()">
-            ⬇️ Tarik Data dari Sheet
-          </button>
-          <button type="button" class="btn-outline-pill" style="font-size: 12px; padding: 7px 14px;" onclick="CloudSync.pushToSheets()">
-            ⬆️ Kirim Data Lokal ke Sheet
-          </button>
-          <button type="button" class="btn-outline-pill" style="font-size: 12px; padding: 7px 14px; color: #dc2626; border-color: #fecaca;" onclick="
-            const sc = CloudSync.getActiveScope();
-            const scLabel = sc === 'masjid' ? 'Masjid Sabilillah' : 'Lingkungan RT';
-            if (confirm(`Putuskan koneksi ke Google Sheets untuk database ${scLabel} dan kembali menggunakan database lokal?`)) {
-              CloudSync.setGasUrl('', sc);
-              document.getElementById('inputGasUrl').value = '';
-              CloudSync.updateStatusUI();
-            }
-          ">
-            🔌 Putuskan
+          <button type="button" id="btnDbProviderSheets" class="btn-scope-tab" onclick="SupabaseSync.switchProviderTab('sheets')" style="flex: 1; padding: 9px 12px; border-radius: 9px; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.2s; border: none; background: transparent; color: #475569; display: flex; align-items: center; justify-content: center; gap: 6px;">
+            <span>📊 Google Sheets (Cadangan / Arsip)</span>
           </button>
         </div>
 
-        <!-- Panduan Singkat -->
-        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 14px; margin-top: 14px; font-size: 12px; color: #334155;">
-          <div style="font-weight: 700; margin-bottom: 6px; color: #0f766e;">Cara Cepat Memasang Database Spreadsheet Mandiri:</div>
-          <ol style="margin-left: 18px; line-height: 1.6;">
-            <li>Buka spreadsheet baru di Google Drive Anda (<a href="https://sheets.new" target="_blank" style="color: #0f766e; font-weight: bold;">sheets.new</a>).</li>
-            <li>Buka menu <strong>Ekstensi &gt; Apps Script</strong>.</li>
-            <li id="modalCloudGuideName">Salin isi kode script backend dari folder <code>google-apps-script/</code> lalu tempelkan.</li>
-            <li>Klik tombol <strong>Deploy &gt; New deployment</strong>, pilih jenis <strong>Web app</strong>.</li>
-            <li>Ubah <em>Who has access</em> menjadi <strong>Anyone</strong> (Wajib agar bisa diakses aplikasi).</li>
-            <li>Salin <strong>Web app URL</strong> (/exec) lalu tempelkan pada kolom input di atas &amp; klik <em>⚡ Tes Koneksi</em>.</li>
-          </ol>
-          <div style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap;">
-            <button type="button" class="btn-outline-pill" style="font-size: 11.5px; padding: 5px 12px;" onclick="
-              alert('Panduan lengkap setup 2 spreadsheet terpisah tersedia di:\ngoogle-apps-script/PANDUAN_SETUP_DATABASE_TERPISAH.md\n\nFile script backend:\n• Lingkungan RT: google-apps-script/Code_RT.gs\n• Masjid Sabilillah: google-apps-script/Code_Masjid.gs');
+        <!-- ====================================================================
+             PANEL 1: SUPABASE CLOUD SQL
+             ==================================================================== -->
+        <div id="panelDbSupabase">
+          <!-- Status Box Supabase -->
+          <div id="modalSupabaseStatus" style="margin-bottom: 12px;"></div>
+
+          <p style="font-size: 12.5px; color: #475569; line-height: 1.5; margin-bottom: 14px;">
+            Database cloud PostgreSQL modern berkecepatan tinggi (~50 ms), tanpa batas kuota harian, pemisahan tabel RT dan Masjid yang rapi, serta fitur sinkronisasi real-time antar perangkat.
+          </p>
+
+          <div class="form-group" style="margin-bottom: 10px;">
+            <label class="form-label">URL Project Supabase *</label>
+            <input type="url" id="inputSupabaseUrl" class="form-control" value="https://jzskyaftklluymxjnxwy.supabase.co" placeholder="https://xxx.supabase.co" style="font-family: monospace; font-size: 12px;">
+          </div>
+
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label class="form-label">Supabase Publishable Key / Anon Key *</label>
+            <input type="text" id="inputSupabaseKey" class="form-control" value="sb_publishable_StjNfRDZaaYL7aZ6G2sUhg_XdYwaqct" placeholder="sb_publishable_..." style="font-family: monospace; font-size: 12px;">
+          </div>
+
+          <!-- Highlight Box: Tombol Migrasi 1-Klik -->
+          <div style="background: linear-gradient(135deg, #064e3b, #047857); border-radius: 14px; padding: 16px 18px; color: #ffffff; margin-bottom: 14px; box-shadow: 0 4px 14px rgba(4, 120, 87, 0.2);">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+              <div>
+                <div style="font-weight: 800; font-size: 14px; display: flex; align-items: center; gap: 6px;">
+                  <span>🚀</span>
+                  <span>Migrasi Data 1-Klik ke Supabase SQL</span>
+                </div>
+                <div style="font-size: 12px; color: #a7f3d0; margin-top: 3px; line-height: 1.4;">
+                  Salin seluruh data warga, riwayat iuran 12 bulan, kas RT, kas masjid, dan aset ke Supabase.
+                </div>
+              </div>
+            </div>
+            <button type="button" class="btn-teal-pill" style="margin-top: 12px; background: #ffffff; color: #064e3b; font-weight: 800; font-size: 13px; width: 100%; justify-content: center; padding: 10px 16px; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" onclick="SupabaseSync.migrateAllToSupabase()">
+              <span>🚀 Mulai Migrasi Seluruh Data ke Supabase Sekarang</span>
+            </button>
+          </div>
+
+          <!-- Action Buttons Supabase -->
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button type="button" class="btn-teal-pill" style="font-size: 12px; padding: 7px 14px;" onclick="SupabaseSync.testConnection()">
+              ⚡ Tes Koneksi
+            </button>
+            <button type="button" class="btn-outline-pill" style="font-size: 12px; padding: 7px 14px;" onclick="SupabaseSync.pullFromSupabase()">
+              ⬇️ Tarik Data Terbaru
+            </button>
+            <button type="button" class="btn-outline-pill" style="font-size: 12px; padding: 7px 14px;" onclick="SupabaseSync.saveSettingsFromModal()">
+              💾 Simpan Kunci
+            </button>
+            <button type="button" class="btn-outline-pill" style="font-size: 12px; padding: 7px 14px; color: #dc2626; border-color: #fecaca;" onclick="SupabaseSync.disconnect()">
+              🔌 Putuskan
+            </button>
+          </div>
+        </div>
+
+        <!-- ====================================================================
+             PANEL 2: GOOGLE SHEETS (OPSIONAL / CADANGAN)
+             ==================================================================== -->
+        <div id="panelDbSheets" style="display: none;">
+          <!-- Scope Switcher Tabs: RT vs Masjid -->
+          <div style="display: flex; gap: 8px; margin-bottom: 14px; background: #f1f5f9; padding: 4px; border-radius: 12px;">
+            <button type="button" id="btnCloudScopeRt" class="btn-scope-tab active" onclick="CloudSync.switchScopeUI('rt')" style="flex: 1; padding: 8px 12px; border-radius: 9px; font-size: 12.5px; font-weight: 600; cursor: pointer; transition: all 0.2s; border: 1px solid #0f766e; background: #0f766e; color: #ffffff; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <span>🏢 Database Lingkungan RT</span>
+            </button>
+            <button type="button" id="btnCloudScopeMasjid" class="btn-scope-tab" onclick="CloudSync.switchScopeUI('masjid')" style="flex: 1; padding: 8px 12px; border-radius: 9px; font-size: 12.5px; font-weight: 600; cursor: pointer; transition: all 0.2s; border: 1px solid #cbd5e1; background: #ffffff; color: #64748b; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <span>🕌 Database Masjid Sabilillah</span>
+            </button>
+          </div>
+
+          <!-- Status Box Sheets -->
+          <div id="modalCloudStatus" style="margin-bottom: 12px;"></div>
+          
+          <!-- Scope Description -->
+          <p id="modalCloudScopeDesc" style="font-size: 12.5px; color: #475569; line-height: 1.5; margin-bottom: 12px;">
+            Hubungkan RukunKu ke Google Sheets menggunakan <strong>Google Apps Script</strong> gratis. Data warga, kas, dan iuran akan tersimpan otomatis di Google Drive Anda.
+          </p>
+
+          <div class="form-group" style="margin-top: 10px;">
+            <label class="form-label" style="display: flex; justify-content: space-between;">
+              <span>URL Web App Google Apps Script *</span>
+              <span id="cloudLastSyncText" style="font-size: 11px; color: #64748b; font-weight: normal;"></span>
+            </label>
+            <input type="url" id="inputGasUrl" class="form-control" placeholder="https://script.google.com/macros/s/.../exec" style="font-family: monospace; font-size: 12px;">
+          </div>
+
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px;">
+            <button type="button" class="btn-teal-pill" style="font-size: 12px; padding: 7px 14px;" onclick="
+              const val = document.getElementById('inputGasUrl').value.trim();
+              CloudSync.testConnection(val);
             ">
-              📖 Buka Petunjuk File &amp; Panduan Terpisah
+              ⚡ Tes Koneksi
+            </button>
+            <button type="button" class="btn-outline-pill" style="font-size: 12px; padding: 7px 14px;" onclick="CloudSync.pullFromSheets()">
+              ⬇️ Tarik Data dari Sheet
+            </button>
+            <button type="button" class="btn-outline-pill" style="font-size: 12px; padding: 7px 14px;" onclick="CloudSync.pushToSheets()">
+              ⬆️ Kirim Data Lokal ke Sheet
+            </button>
+            <button type="button" class="btn-outline-pill" style="font-size: 12px; padding: 7px 14px; color: #dc2626; border-color: #fecaca;" onclick="
+              const sc = CloudSync.getActiveScope();
+              const scLabel = sc === 'masjid' ? 'Masjid Sabilillah' : 'Lingkungan RT';
+              if (confirm(`Putuskan koneksi ke Google Sheets untuk database ${scLabel} dan kembali menggunakan database lokal?`)) {
+                CloudSync.setGasUrl('', sc);
+                document.getElementById('inputGasUrl').value = '';
+                CloudSync.updateStatusUI();
+              }
+            ">
+              🔌 Putuskan
             </button>
           </div>
         </div>
@@ -3170,11 +3221,14 @@
     </div>
   </div>
 
+  <!-- Supabase Official JS SDK via CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- Scripts with cache-busting -->
-  <script src="js/data.js?v=20261022_06"></script>
-  <script src="js/cloud-sync.js?v=20261022_06"></script>
-  <script src="js/report-pdf.js?v=20261022_06"></script>
-  <script src="js/app.js?v=20261022_06"></script>
+  <script src="js/data.js?v=20261022_07"></script>
+  <script src="js/supabase-sync.js?v=20261022_07"></script>
+  <script src="js/cloud-sync.js?v=20261022_07"></script>
+  <script src="js/report-pdf.js?v=20261022_07"></script>
+  <script src="js/app.js?v=20261022_07"></script>
 
   <script>
     // Set default date picker values to today (bulletproof ready check)
