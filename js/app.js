@@ -1345,7 +1345,7 @@ const App = {
     this.logout();
   },
 
-  loginSubmit(event) {
+  async loginSubmit(event) {
     event.preventDefault();
     this.data = DB.load(); // Refresh data dari storage agar akun dan status paling mutakhir
     const selectedRoleEl = document.querySelector('.auth-role-card.selected');
@@ -1476,7 +1476,7 @@ const App = {
       }
 
       // 3. Fallback Cerdas: Jika pengguna lupa memilih kartu "Warga" tapi memasukkan NIK/No WA warga yang valid
-      const residentFallback = (this.data.residents || []).find(r => {
+      let residentFallback = (this.data.residents || []).find(r => {
         const rNik = r.nik ? String(r.nik).replace(/^'/, '').trim() : '';
         const rPhone = r.phone ? String(r.phone).replace(/^'/, '').trim() : '';
         const rNoKk = r.noKk ? String(r.noKk).replace(/^'/, '').trim() : '';
@@ -1492,6 +1492,16 @@ const App = {
           (rNoKk && rNoKk === username)
         );
       });
+
+      if (!residentFallback && window.SupabaseSync && typeof window.SupabaseSync.findResidentOnline === 'function') {
+        const onlineRes = await window.SupabaseSync.findResidentOnline(username, cleanPhoneInput);
+        if (onlineRes) {
+          residentFallback = onlineRes;
+          if (!this.data.residents) this.data.residents = [];
+          this.data.residents.push(residentFallback);
+          DB.save(this.data, { skipSync: true });
+        }
+      }
 
       if (residentFallback) {
         const validPass = residentFallback.password || '123456';
@@ -1551,7 +1561,7 @@ const App = {
       }
 
       // Login Warga (Cari NIK, Phone dengan normalisasi 08 <-> 628, Nama, atau Username)
-      const resident = (this.data.residents || []).find(r => {
+      let resident = (this.data.residents || []).find(r => {
         const rNik = r.nik ? String(r.nik).replace(/^'/, '').trim() : '';
         const rPhone = r.phone ? String(r.phone).replace(/^'/, '').trim() : '';
         const rNoKk = r.noKk ? String(r.noKk).replace(/^'/, '').trim() : '';
@@ -1567,6 +1577,22 @@ const App = {
           (rNoKk && rNoKk === username)
         );
       });
+
+      // Jika belum ditemukan di data lokal, cari langsung ke database Supabase secara online!
+      if (!resident && window.SupabaseSync && typeof window.SupabaseSync.findResidentOnline === 'function') {
+        const onlineRes = await window.SupabaseSync.findResidentOnline(username, cleanPhoneInput);
+        if (onlineRes) {
+          resident = onlineRes;
+          if (!this.data.residents) this.data.residents = [];
+          const idx = this.data.residents.findIndex(r => r.id === resident.id);
+          if (idx >= 0) {
+            this.data.residents[idx] = resident;
+          } else {
+            this.data.residents.push(resident);
+          }
+          DB.save(this.data, { skipSync: true });
+        }
+      }
 
       if (!resident) {
         alert("Data akun warga tidak ditemukan!\n\n💡 Pastikan NIK atau No. WhatsApp Anda sudah terdaftar di sistem lingkungan, atau klik tab 'Daftar Akun Warga'.\n\nUntuk pengurus, gunakan Username: admin & Password: 123.");
