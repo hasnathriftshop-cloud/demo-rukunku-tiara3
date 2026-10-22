@@ -89,9 +89,7 @@ const SupabaseSync = {
     this.updateStatusUI();
 
     // Auto pull data terbaru dari Supabase saat aplikasi dibuka
-    setTimeout(() => {
-      this.pullFromSupabase({ silent: true });
-    }, 800);
+    this.pullFromSupabase({ silent: true });
   },
 
   setupRealtime() {
@@ -365,41 +363,99 @@ const SupabaseSync = {
         stats.residents = resRows.length;
       }
 
-      // 5. Migrasi Matriks Iuran 12 Bulan
+      // 5. Migrasi Matriks Iuran 12 Bulan (Mendukung format flat maupun per-tahun)
       if (localData.duesMatrix && typeof localData.duesMatrix === 'object') {
         const duesRows = [];
-        Object.entries(localData.duesMatrix).forEach(([resId, years]) => {
-          if (years && typeof years === 'object') {
-            Object.entries(years).forEach(([yr, months]) => {
+        const curYear = new Date().getFullYear();
+
+        Object.entries(localData.duesMatrix).forEach(([key, val]) => {
+          if (!val || typeof val !== 'object') return;
+
+          // Case A: key adalah tahun (misal '2026') -> val: { [resId]: { [month]: status } }
+          if (/^\d{4}$/.test(key)) {
+            const yr = parseInt(key);
+            Object.entries(val).forEach(([resId, months]) => {
               if (months && typeof months === 'object') {
                 duesRows.push({
                   resident_id: resId,
-                  tahun: parseInt(yr) || 2026,
-                  m1: months['1'] || 'Belum',
-                  m2: months['2'] || 'Belum',
-                  m3: months['3'] || 'Belum',
-                  m4: months['4'] || 'Belum',
-                  m5: months['5'] || 'Belum',
-                  m6: months['6'] || 'Belum',
-                  m7: months['7'] || 'Belum',
-                  m8: months['8'] || 'Belum',
-                  m9: months['9'] || 'Belum',
-                  m10: months['10'] || 'Belum',
-                  m11: months['11'] || 'Belum',
-                  m12: months['12'] || 'Belum'
+                  tahun: yr,
+                  m1: months['1'] || months[1] || 'Belum',
+                  m2: months['2'] || months[2] || 'Belum',
+                  m3: months['3'] || months[3] || 'Belum',
+                  m4: months['4'] || months[4] || 'Belum',
+                  m5: months['5'] || months[5] || 'Belum',
+                  m6: months['6'] || months[6] || 'Belum',
+                  m7: months['7'] || months[7] || 'Belum',
+                  m8: months['8'] || months[8] || 'Belum',
+                  m9: months['9'] || months[9] || 'Belum',
+                  m10: months['10'] || months[10] || 'Belum',
+                  m11: months['11'] || months[11] || 'Belum',
+                  m12: months['12'] || months[12] || 'Belum'
                 });
               }
             });
+          } 
+          // Case B: key adalah residentId (misal 'W-001', 'W-004')
+          else {
+            const resId = key;
+            const isDirectMonths = Object.keys(val).some(k => ['1','2','3','4','5','6','7','8','9','10','11','12'].includes(String(k)) && typeof val[k] === 'string');
+            
+            if (isDirectMonths) {
+              duesRows.push({
+                resident_id: resId,
+                tahun: curYear,
+                m1: val['1'] || val[1] || 'Belum',
+                m2: val['2'] || val[2] || 'Belum',
+                m3: val['3'] || val[3] || 'Belum',
+                m4: val['4'] || val[4] || 'Belum',
+                m5: val['5'] || val[5] || 'Belum',
+                m6: val['6'] || val[6] || 'Belum',
+                m7: val['7'] || val[7] || 'Belum',
+                m8: val['8'] || val[8] || 'Belum',
+                m9: val['9'] || val[9] || 'Belum',
+                m10: val['10'] || val[10] || 'Belum',
+                m11: val['11'] || val[11] || 'Belum',
+                m12: val['12'] || val[12] || 'Belum'
+              });
+            } else {
+              Object.entries(val).forEach(([yrStr, months]) => {
+                if (months && typeof months === 'object') {
+                  duesRows.push({
+                    resident_id: resId,
+                    tahun: parseInt(yrStr) || curYear,
+                    m1: months['1'] || months[1] || 'Belum',
+                    m2: months['2'] || months[2] || 'Belum',
+                    m3: months['3'] || months[3] || 'Belum',
+                    m4: months['4'] || months[4] || 'Belum',
+                    m5: months['5'] || months[5] || 'Belum',
+                    m6: months['6'] || months[6] || 'Belum',
+                    m7: months['7'] || months[7] || 'Belum',
+                    m8: months['8'] || months[8] || 'Belum',
+                    m9: months['9'] || months[9] || 'Belum',
+                    m10: months['10'] || months[10] || 'Belum',
+                    m11: months['11'] || months[11] || 'Belum',
+                    m12: months['12'] || months[12] || 'Belum'
+                  });
+                }
+              });
+            }
           }
         });
 
-        if (duesRows.length > 0) {
+        // Dedup by resident_id + tahun
+        const uniqueDuesMap = new Map();
+        duesRows.forEach(row => {
+          uniqueDuesMap.set(`${row.resident_id}_${row.tahun}`, row);
+        });
+        const finalDuesRows = Array.from(uniqueDuesMap.values());
+
+        if (finalDuesRows.length > 0) {
           await fetch(this.getRestUrl('rt_dues'), {
             method: 'POST',
             headers: this.getHeaders(true),
-            body: JSON.stringify(duesRows)
+            body: JSON.stringify(finalDuesRows)
           });
-          stats.duesRows = duesRows.length;
+          stats.duesRows = finalDuesRows.length;
         }
       }
 
@@ -691,13 +747,16 @@ const SupabaseSync = {
         }));
       }
 
-      // 5. Dues Matrix
+      // 5. Dues Matrix (Mendukung format per-tahun dan flat untuk kompatibilitas penuh)
       let mergedDues = currentLocal.duesMatrix || {};
       if (Array.isArray(resDues) && resDues.length > 0) {
-        mergedDues = {};
+        if (!mergedDues) mergedDues = {};
         resDues.forEach(row => {
-          if (!mergedDues[row.resident_id]) mergedDues[row.resident_id] = {};
-          mergedDues[row.resident_id][String(row.tahun)] = {
+          const yrStr = String(row.tahun || 2026);
+          const resId = row.resident_id;
+          if (!resId) return;
+
+          const monthMap = {
             "1": row.m1 || 'Belum',
             "2": row.m2 || 'Belum',
             "3": row.m3 || 'Belum',
@@ -711,6 +770,19 @@ const SupabaseSync = {
             "11": row.m11 || 'Belum',
             "12": row.m12 || 'Belum'
           };
+
+          // Format: mergedDues[yrStr][resId]
+          if (!mergedDues[yrStr]) mergedDues[yrStr] = {};
+          mergedDues[yrStr][resId] = { ...monthMap };
+
+          // Format: mergedDues[resId][yrStr]
+          if (!mergedDues[resId]) mergedDues[resId] = {};
+          mergedDues[resId][yrStr] = { ...monthMap };
+
+          // Format Flat 1-12 untuk tahun berjalan
+          if (yrStr === '2026' || yrStr === String(new Date().getFullYear())) {
+            Object.assign(mergedDues[resId], monthMap);
+          }
         });
       }
 
@@ -956,6 +1028,47 @@ const SupabaseSync = {
     } catch (e) {
       console.warn("Silent snapshot sync error:", e);
     }
+  },
+
+  // Cari akun warga langsung ke Supabase (Fallback Login Online Real-time)
+  async findResidentOnline(query, cleanPhone = '') {
+    if (!query) return null;
+    try {
+      const q = encodeURIComponent(String(query).trim());
+      const cp = encodeURIComponent(String(cleanPhone || query).trim());
+      const url = this.getRestUrl(`rt_residents?or=(nik.eq.${q},phone.eq.${q},phone.eq.${cp},nama.ilike.${q},no_kk.eq.${q})&limit=1`);
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: this.getHeaders()
+      });
+      if (!res.ok) return null;
+      const rows = await res.json();
+      if (Array.isArray(rows) && rows.length > 0) {
+        const r = rows[0];
+        return {
+          id: r.id,
+          nama: r.nama,
+          nik: r.nik || '',
+          noKk: r.no_kk || '',
+          blok: r.blok || '',
+          noRumah: r.no_rumah || '',
+          alamat: r.alamat || '',
+          phone: r.phone || '',
+          jumlahAnggota: r.jumlah_anggota || 1,
+          statusHunian: r.status_hunian || 'Tetap',
+          pekerjaan: r.pekerjaan || '',
+          statusAktif: r.status_aktif || 'Aktif',
+          tanggalMasuk: r.tanggal_masuk || '',
+          avatarBg: r.avatar_bg || '#0d9488',
+          password: r.password || '123456',
+          familyMembers: Array.isArray(r.family_members) ? r.family_members : [],
+          fotoKk: r.foto_kk || ''
+        };
+      }
+    } catch (e) {
+      console.warn("Supabase findResidentOnline error:", e);
+    }
+    return null;
   },
 
   // =========================================================================
