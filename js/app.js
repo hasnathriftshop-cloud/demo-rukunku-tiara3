@@ -156,6 +156,23 @@ const App = {
     });
     const bottomNav = document.querySelector('.bottom-nav');
     if (bottomNav) bottomNav.style.display = 'none';
+
+    // Pastikan form input login selalu bersih saat kembali ke layar login
+    const u = document.getElementById('authUsername');
+    if (u) {
+      u.value = '';
+      u.placeholder = 'Contoh: admin atau nama pengurus';
+    }
+    const p = document.getElementById('authPassword');
+    if (p) {
+      p.value = '';
+      p.placeholder = 'Password akun';
+    }
+    const hint = document.getElementById('authUsernameHint');
+    if (hint) {
+      hint.style.display = 'none';
+      hint.textContent = '';
+    }
   },
 
   // Initialize Session (Checks sessionStorage first so fresh browser link shows login first)
@@ -1093,32 +1110,29 @@ const App = {
     const passInput = document.getElementById('authPassword');
     const hint = document.getElementById('authUsernameHint');
 
+    // Kosongkan nilai input agar placeholder keterangan tetap muncul bersih
+    if (input) input.value = '';
+    if (passInput) passInput.value = '';
+    if (hint) {
+      hint.style.display = 'none';
+      hint.textContent = '';
+    }
+
     if (role === 'admin_masjid') {
       if (label) label.textContent = 'Username Admin Masjid *';
       if (input) {
-        input.placeholder = 'Contoh: masjid atau takmir';
-      }
-      if (passInput) {
-        passInput.placeholder = 'Password akun masjid';
-      }
-      if (hint) {
-        hint.style.display = 'block';
-        hint.innerHTML = '💡 Default login: Username <strong>masjid</strong> &bull; Password <strong>123</strong>';
-        hint.style.color = '#047857';
-        hint.style.fontSize = '12px';
-        hint.style.marginTop = '6px';
-      }
-    } else if (role === 'pengurus') {
-      if (label) label.textContent = 'Username Pengurus *';
-      if (input) {
-        input.placeholder = 'Contoh: admin atau nama petugas';
+        input.placeholder = 'Contoh: admin atau nama pengurus';
       }
       if (passInput) {
         passInput.placeholder = 'Password akun';
       }
-      if (hint) {
-        hint.style.display = 'none';
-        hint.textContent = '';
+    } else if (role === 'pengurus') {
+      if (label) label.textContent = 'Username Pengurus *';
+      if (input) {
+        input.placeholder = 'Contoh: admin atau nama pengurus';
+      }
+      if (passInput) {
+        passInput.placeholder = 'Password akun';
       }
     } else {
       if (label) label.textContent = 'Akun Warga (NIK / No. WhatsApp / Nama KK) *';
@@ -1127,10 +1141,6 @@ const App = {
       }
       if (passInput) {
         passInput.placeholder = 'Password akun warga';
-      }
-      if (hint) {
-        hint.style.display = 'none';
-        hint.textContent = '';
       }
     }
   },
@@ -1271,7 +1281,7 @@ const App = {
     if ((role === 'admin_masjid' && !isAdminRt) || isMasjidUser) {
       const validMasjidPass = masjidAdmin.password || '123';
       if (pass !== validMasjidPass && pass !== '123') {
-        alert("Password akun Admin Masjid salah!\n\n💡 Default password: 123");
+        alert("Password akun Admin Masjid salah! Silakan periksa kembali password Anda.");
         return;
       }
 
@@ -1531,6 +1541,12 @@ const App = {
     sessionStorage.setItem('rukunku_auth_session', JSON.stringify(user));
     localStorage.setItem('rukunku_auth_session', JSON.stringify(user));
     this.renderRoleUI();
+
+    // Bersihkan nilai input form login agar tidak tersimpan di DOM
+    const uIn = document.getElementById('authUsername');
+    if (uIn) uIn.value = '';
+    const pIn = document.getElementById('authPassword');
+    if (pIn) pIn.value = '';
   },
 
   logout() {
@@ -1555,6 +1571,17 @@ const App = {
 
       this.switchAuthTab('login');
       this.selectAuthRole('pengurus');
+
+      const uIn = document.getElementById('authUsername');
+      if (uIn) {
+        uIn.value = '';
+        uIn.placeholder = 'Contoh: admin atau nama pengurus';
+      }
+      const pIn = document.getElementById('authPassword');
+      if (pIn) {
+        pIn.value = '';
+        pIn.placeholder = 'Password akun';
+      }
     }
   },
 
