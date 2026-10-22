@@ -3182,24 +3182,33 @@ textarea.form-control {
 }
 
 @media print {
-  body * {
-    visibility: hidden;
+  body {
+    background: #ffffff !important;
+    padding: 0 !important;
+    margin: 0 !important;
   }
-  #printableMadingJumat, #printableMadingJumat * {
-    visibility: visible;
+  body::before, body::after, .sidebar, .top-header, .btn-teal-pill, .btn-outline-pill, .bottom-nav, .filter-card, .chart-section, .bottom-dashboard-grid, .page-title-row, .no-print {
+    display: none !important;
+  }
+  .app-container, .main-wrapper, .content-body {
+    display: block !important;
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    width: 100% !important;
   }
   #printableMadingJumat {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    margin: 0;
-    padding: 20px;
-    box-shadow: none;
-    border: none;
-  }
-  .no-print {
-    display: none !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 10px 15px !important;
+    box-shadow: none !important;
+    border: none !important;
   }
 }
 
