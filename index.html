@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
   <!-- Custom Modern Stylesheet -->
-  <link rel="stylesheet" href="css/style.css?v=20261022_02">
+  <link rel="stylesheet" href="css/style.css?v=20261022_03">
 </head>
 <body>
 
@@ -1122,9 +1122,9 @@
                 </div>
               </div>
               <div style="background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(8px); padding: 12px 18px; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.2); text-align: right;">
-                <div style="font-size: 11.5px; color: #d1fae5;">Perolehan Kotak Jariyah Ahad:</div>
+                <div style="font-size: 11.5px; color: #d1fae5;" id="masjidHeroKotakAhadLabel">Perolehan Kotak Jariyah Ahad (Bulan Ini):</div>
                 <div id="masjidHeroKotakAhad" style="font-size: 18px; font-weight: 800; color: #fef08a; margin-top: 2px;">Rp 0</div>
-                <div style="font-size: 11px; color: #a7f3d0; margin-top: 2px;">Keliling Rumah Warga Tiap Minggu</div>
+                <div style="font-size: 11px; color: #a7f3d0; margin-top: 2px;">Reset Otomatis Setiap Ganti Bulan</div>
               </div>
             </div>
           </div>
@@ -1293,64 +1293,53 @@
               <h1 class="page-title">Buku Kas & Penerimaan Dana Masjid</h1>
               <p class="page-subtitle">Pencatatan kas masuk (infaq jumat, kotak keliling, wakaf) dan pengeluaran operasional DKM</p>
             </div>
-            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-              <button class="btn-teal-pill" style="background: #047857;" onclick="App.openCatatKasMasjidModal('masuk')">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <div class="masjid-header-actions">
+              <button type="button" class="btn-masjid-compact btn-masjid-in" onclick="App.openCatatKasMasjidModal('masuk')">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 <span>+ Catat Pemasukan</span>
               </button>
-              <button class="btn-outline-pill" style="color: #be123c; border-color: #fca5a5; background: #fff1f2;" onclick="App.openCatatKasMasjidModal('keluar')">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              <button type="button" class="btn-masjid-compact btn-masjid-out" onclick="App.openCatatKasMasjidModal('keluar')">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 <span>- Catat Pengeluaran</span>
               </button>
-              <button class="btn-outline-pill" style="color: #dc2626; border-color: #fca5a5; background: #fff5f5; font-size: 12px;" onclick="App.resetMasjidDataToZero()" title="Kosongkan seluruh data transaksi kas masjid & mulai input dari nol">
-                <span>🗑️ Kosongkan Data (Mulai Nol)</span>
+              <button type="button" class="btn-masjid-compact btn-masjid-reset" onclick="App.resetMasjidDataToZero()" title="Kosongkan data kas masjid & mulai input dari nol">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                <span>Kosongkan Data</span>
               </button>
             </div>
           </div>
 
-          <!-- Filter & Search Toolbar -->
-          <div class="filter-card">
-            <div class="filter-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
-              <div class="form-group">
-                <label class="form-label">Jenis Kas</label>
-                <select id="filterMasjidTipe" class="form-control" onchange="App.renderMasjidKas()">
-                  <option value="all">Semua Aliran Kas</option>
-                  <option value="masuk">Kas Masuk (Infaq & Donasi)</option>
-                  <option value="keluar">Kas Keluar (Pengeluaran)</option>
-                </select>
-              </div>
-
-              <div class="form-group">
-                <label class="form-label">Kantong Dana</label>
-                <select id="filterMasjidKantong" class="form-control" onchange="App.renderMasjidKas()">
-                  <option value="all">Semua Kantong Kas</option>
-                  <option value="Kas Umum">Kas Umum (Operasional)</option>
-                  <option value="Pembangunan">Wakaf Pembangunan</option>
-                  <option value="Sosial & ZIS">Sosial & ZIS</option>
-                </select>
-              </div>
-
-              <div class="form-group">
-                <label class="form-label">Kategori</label>
-                <select id="filterMasjidKategori" class="form-control" onchange="App.renderMasjidKas()">
-                  <option value="all">Semua Kategori</option>
-                  <option value="Kotak Amal Masjid">Kotak Amal Masjid</option>
-                  <option value="Kotak Jariyah Keliling Ahad">Kotak Jariyah Keliling Ahad</option>
-                  <option value="Infaq Jumat">Infaq Jumat</option>
-                  <option value="Infaq/Donasi Tetap Hamba Allah">Infaq/Donasi Tetap Hamba Allah</option>
-                  <option value="Dana Wakaf / Jariyah Pembangunan">Wakaf Pembangunan</option>
-                  <option value="Zakat, Infak, dan Sedekah (ZIS)">ZIS & Sedekah</option>
-                  <option value="Utilitas Masjid">Utilitas (Listrik/Air)</option>
-                  <option value="Honor & Insentif Marbot/Imam/Muazin">Honor Marbot/Imam</option>
-                  <option value="Perlengkapan Kebersihan & Sanitasi">Kebersihan & Sanitasi</option>
-                  <option value="Perbaikan & Maintenance Inventaris">Perbaikan & Maintenance</option>
-                </select>
-              </div>
-
-              <div class="form-group">
-                <label class="form-label">Cari Transaksi</label>
-                <input type="text" id="filterMasjidSearch" class="form-control" placeholder="Cari uraian / donatur..." oninput="App.renderMasjidKas()">
-              </div>
+          <!-- Filter & Search Toolbar Ringkas & Rapi -->
+          <div class="masjid-filter-toolbar">
+            <div class="masjid-search-box">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <input type="text" id="filterMasjidSearch" class="masjid-search-input" placeholder="Cari uraian, donatur, pihak, atau metode..." oninput="App.renderMasjidKas()">
+            </div>
+            <div class="masjid-filter-selects">
+              <select id="filterMasjidTipe" class="masjid-filter-select" onchange="App.renderMasjidKas()">
+                <option value="all">Semua Jenis Kas</option>
+                <option value="masuk">Kas Masuk (Infaq/Donasi)</option>
+                <option value="keluar">Kas Keluar (Pengeluaran)</option>
+              </select>
+              <select id="filterMasjidKantong" class="masjid-filter-select" onchange="App.renderMasjidKas()">
+                <option value="all">Semua Kantong Kas</option>
+                <option value="Kas Umum">Kas Umum</option>
+                <option value="Pembangunan">Pembangunan</option>
+                <option value="Sosial & ZIS">Sosial & ZIS</option>
+              </select>
+              <select id="filterMasjidKategori" class="masjid-filter-select" onchange="App.renderMasjidKas()">
+                <option value="all">Semua Kategori</option>
+                <option value="Kotak Amal Masjid">Kotak Amal Masjid</option>
+                <option value="Kotak Jariyah Keliling Ahad">Kotak Jariyah Keliling Ahad</option>
+                <option value="Infaq Jumat">Infaq Jumat</option>
+                <option value="Infaq/Donasi Tetap Hamba Allah">Donasi Tetap</option>
+                <option value="Dana Wakaf / Jariyah Pembangunan">Wakaf Pembangunan</option>
+                <option value="Zakat, Infak, dan Sedekah (ZIS)">ZIS & Sedekah</option>
+                <option value="Utilitas Masjid">Utilitas (Listrik/Air)</option>
+                <option value="Honor & Insentif Marbot/Imam/Muazin">Honor Marbot/Imam</option>
+                <option value="Perlengkapan Kebersihan & Sanitasi">Kebersihan & Sanitasi</option>
+                <option value="Perbaikan & Maintenance Inventaris">Perbaikan & Maintenance</option>
+              </select>
             </div>
           </div>
 
@@ -1518,14 +1507,14 @@
 
           <!-- Printable Sheet Paper Container -->
           <div id="printableMadingJumat" class="printable-mading-container">
-            <!-- Kop Surat Resmi DKM -->
-            <div class="mading-kop">
-              <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 4px;">
-                <span style="font-size: 32px;">🕌</span>
-                <div class="mading-kop-title" id="madingNamaMasjid">DEWAN KEMAKMURAN MASJID (DKM) MASJID SABILILLAH</div>
+            <!-- Kop Surat Resmi DKM (Tebal & Rata Tengah Sempurna) -->
+            <div class="mading-kop" style="text-align: center !important; border-bottom: 3px double #064e3b; padding-bottom: 12px; margin-bottom: 18px; width: 100%;">
+              <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 4px; text-align: center !important;">
+                <span style="font-size: 30px;">🕌</span>
+                <div class="mading-kop-title" id="madingNamaMasjid" style="font-size: 18px; font-weight: 900; color: #064e3b; text-transform: uppercase; letter-spacing: 0.5px; text-align: center !important;">DEWAN KEMAKMURAN MASJID (DKM) MASJID SABILILLAH</div>
               </div>
-              <div class="mading-kop-sub" id="madingAlamatMasjid">Perumahan Tiara Candi 3, Kel. Sukamaju, Kec. Cilodong, Kota Depok</div>
-              <div class="mading-kop-addr" id="madingRekeningMasjid">Rekening Infaq Resmi BSI: 712-345-6789 a.n DKM Masjid Sabilillah</div>
+              <div class="mading-kop-sub" id="madingAlamatMasjid" style="font-size: 13px; font-weight: 800; color: #1e293b; text-align: center !important; margin: 3px auto; display: block;">Perumahan Tiara Candi 3 Sekargadung</div>
+              <div class="mading-kop-addr" id="madingRekeningMasjid" style="font-size: 12.5px; font-weight: 800; color: #047857; text-align: center !important; margin: 3px auto; display: block;">Rekening Infaq Resmi: 7207571808 BSI a.n Masjid Sabilillah</div>
             </div>
 
             <!-- Judul Dokumen Laporan -->
@@ -3053,10 +3042,10 @@
   </div>
 
   <!-- Scripts with cache-busting -->
-  <script src="js/data.js?v=20261022_02"></script>
-  <script src="js/cloud-sync.js?v=20261022_02"></script>
-  <script src="js/report-pdf.js?v=20261022_02"></script>
-  <script src="js/app.js?v=20261022_02"></script>
+  <script src="js/data.js?v=20261022_03"></script>
+  <script src="js/cloud-sync.js?v=20261022_03"></script>
+  <script src="js/report-pdf.js?v=20261022_03"></script>
+  <script src="js/app.js?v=20261022_03"></script>
 
   <script>
     // Set default date picker values to today (bulletproof ready check)
