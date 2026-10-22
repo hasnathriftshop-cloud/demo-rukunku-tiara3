@@ -44,6 +44,11 @@ const SupabaseSync = {
     }
   },
 
+  isConfigured() {
+    const cfg = this.getConfig();
+    return !!(cfg && cfg.enabled && cfg.url && cfg.key);
+  },
+
   getHeaders(preferMerge = false) {
     const cfg = this.getConfig();
     const headers = {
@@ -869,21 +874,25 @@ const SupabaseSync = {
       DB.save(finalData, { skipSync: true });
       if (window.App) {
         window.App.data = finalData;
-        if (typeof window.App.cleanDataSeparation === 'function') window.App.cleanDataSeparation();
-        if (typeof window.App.renderDashboard === 'function') window.App.renderDashboard();
-        if (typeof window.App.renderResidents === 'function') window.App.renderResidents();
-        if (typeof window.App.renderTransactions === 'function') window.App.renderTransactions();
-        if (typeof window.App.renderDuesMatrix === 'function') window.App.renderDuesMatrix();
-        if (typeof window.App.renderChart === 'function') window.App.renderChart();
-        if (typeof window.App.renderFinancialReport === 'function') window.App.renderFinancialReport();
-        if (typeof window.App.renderSetoranBlok === 'function') window.App.renderSetoranBlok();
-        if (typeof window.App.renderTalangan === 'function') window.App.renderTalangan();
-        if (typeof window.App.renderKelolaPetugasPage === 'function') window.App.renderKelolaPetugasPage();
-        if (typeof window.App.renderMasjidDashboard === 'function') window.App.renderMasjidDashboard();
-        if (typeof window.App.renderMasjidKas === 'function') window.App.renderMasjidKas();
-        if (typeof window.App.renderMasjidAset === 'function') window.App.renderMasjidAset();
-        if (typeof window.App.renderMasjidLaporan === 'function') window.App.renderMasjidLaporan();
-        if (typeof window.App.renderWargaMasjidTransparansi === 'function') window.App.renderWargaMasjidTransparansi();
+        try {
+          if (typeof window.App.cleanDataSeparation === 'function') window.App.cleanDataSeparation();
+          if (typeof window.App.renderDashboard === 'function') window.App.renderDashboard();
+          if (typeof window.App.renderResidents === 'function') window.App.renderResidents();
+          if (typeof window.App.renderTransactions === 'function') window.App.renderTransactions();
+          if (typeof window.App.renderDuesMatrix === 'function') window.App.renderDuesMatrix();
+          if (typeof window.App.renderChart === 'function') window.App.renderChart();
+          if (typeof window.App.renderFinancialReport === 'function') window.App.renderFinancialReport();
+          if (typeof window.App.renderSetoranBlok === 'function') window.App.renderSetoranBlok();
+          if (typeof window.App.renderTalangan === 'function') window.App.renderTalangan();
+          if (typeof window.App.renderKelolaPetugasPage === 'function') window.App.renderKelolaPetugasPage();
+          if (typeof window.App.renderMasjidDashboard === 'function') window.App.renderMasjidDashboard();
+          if (typeof window.App.renderMasjidKas === 'function') window.App.renderMasjidKas();
+          if (typeof window.App.renderMasjidAset === 'function') window.App.renderMasjidAset();
+          if (typeof window.App.renderMasjidLaporan === 'function') window.App.renderMasjidLaporan();
+          if (typeof window.App.renderWargaMasjidTransparansi === 'function') window.App.renderWargaMasjidTransparansi();
+        } catch (uiErr) {
+          console.warn("UI refresh warning after Supabase pull:", uiErr);
+        }
       }
 
       this.status = 'connected';
