@@ -608,10 +608,16 @@ const DEFAULT_DATA = {
     bendahara: "H. Sudirman",
     sekretaris: "Ust. M. Ridwan",
     marbot: "Bpk. Subur & Bpk. Warsito",
-    nomorRekening: "BSI: 712-345-6789 a.n DKM Masjid Sabilillah",
+    nomorRekening: "BSI 712-345-6789 a.n DKM Masjid Sabilillah",
     qrisUrl: "",
     contactWa: "6281234567809",
-    saldoAwal: 0
+    saldoAwal: 0,
+    // Informasi Program Kotak Jariyah Keliling Ahad
+    jariyahJudul: "Kotak Jariyah Keliling Ahad",
+    jariyahWaktu: "Setiap hari Minggu pagi (07.00 - 08.30)",
+    jariyahDeskripsi: "Program rutin jemput jariyah warga lingkungan perumahan untuk operasional masjid & santunan dhuafa.",
+    jariyahJadwal: "Tiap Ahad Pagi",
+    jariyahPetugas: "Bpk. Subur & Bpk. Warsito (Blok A, B, C, D)"
   },
 
   masjidAdmin: {
