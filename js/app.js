@@ -1326,7 +1326,7 @@ const App = {
 
   // Resident changes their own password from Warga Profile view
   changeMyWargaPassword() {
-    const resident = (this.data.residents || []).find(r => r.id === AppState.currentResidentId);
+    const resident = this.getCurrentResident();
     if (!resident) return;
     const newPwd = prompt("Masukkan password baru untuk akun Anda (minimal 6 karakter):");
     if (newPwd === null) return;
@@ -1337,6 +1337,9 @@ const App = {
     }
     resident.password = clean;
     DB.save(this.data);
+    if (window.SupabaseSync && typeof window.SupabaseSync.saveResidentDirect === 'function') {
+      window.SupabaseSync.saveResidentDirect(resident);
+    }
     this.renderWargaProfile();
     alert("✅ Password akun Anda berhasil diperbarui!");
   },
@@ -4988,8 +4991,39 @@ const App = {
   // =========================================================================
   // Warga Specific Views (Iuran Rumah Sendiri & Profil Biodata)
   // =========================================================================
+  getCurrentResident() {
+    const resId = AppState.currentResidentId || AppState.currentUser?.residentId;
+    if (resId && Array.isArray(this.data.residents)) {
+      const found = this.data.residents.find(r => r.id === resId);
+      if (found) {
+        AppState.currentResidentId = found.id;
+        return found;
+      }
+    }
+    // Match by NIK or Phone or Nama if logged in as warga
+    if (AppState.currentUser && Array.isArray(this.data.residents)) {
+      const cUser = AppState.currentUser;
+      const byIdent = this.data.residents.find(r => 
+        (r.id && r.id === cUser.residentId) ||
+        (r.nik && (r.nik === cUser.username || r.nik === cUser.nik)) ||
+        (r.phone && (r.phone === cUser.username || r.phone === cUser.phone)) ||
+        (r.nama && r.nama.toLowerCase() === (cUser.name || '').toLowerCase())
+      );
+      if (byIdent) {
+        AppState.currentResidentId = byIdent.id;
+        return byIdent;
+      }
+    }
+    // Fallback if role is warga: fallback to first resident
+    if (AppState.currentRole === 'warga' && Array.isArray(this.data.residents) && this.data.residents.length > 0) {
+      AppState.currentResidentId = this.data.residents[0].id;
+      return this.data.residents[0];
+    }
+    return null;
+  },
+
   renderWargaProfile() {
-    const resident = (this.data.residents || []).find(r => r.id === AppState.currentResidentId) || this.data.residents[0];
+    const resident = this.getCurrentResident();
     const container = document.getElementById('wargaProfileContainer');
     if (!container || !resident) return;
 
@@ -5217,7 +5251,7 @@ const App = {
     if (!file) return;
 
     try {
-      const resident = (this.data.residents || []).find(r => r.id === AppState.currentResidentId);
+      const resident = this.getCurrentResident();
       if (!resident) {
         alert("Sesi warga tidak aktif!");
         return;
@@ -5228,7 +5262,10 @@ const App = {
       DB.save(this.data);
       this.renderWargaProfile();
 
-      // Sync direct ke Google Sheets & Google Drive
+      // Sync direct ke Supabase & Google Sheets
+      if (window.SupabaseSync && typeof window.SupabaseSync.saveResidentDirect === 'function') {
+        window.SupabaseSync.saveResidentDirect(resident);
+      }
       if (window.CloudSync && typeof window.CloudSync.saveResidentDirect === 'function') {
         const success = await window.CloudSync.saveResidentDirect(resident);
         if (success) {
@@ -5243,11 +5280,14 @@ const App = {
 
   removeKkDocument() {
     if (!confirm("Hapus foto Kartu Keluarga (KK) yang tersimpan?")) return;
-    const resident = (this.data.residents || []).find(r => r.id === AppState.currentResidentId);
+    const resident = this.getCurrentResident();
     if (!resident) return;
     resident.fotoKk = "";
     DB.save(this.data);
-    // Sync direct to Google Sheets
+    // Sync direct to Supabase & Google Sheets
+    if (window.SupabaseSync && typeof window.SupabaseSync.saveResidentDirect === 'function') {
+      window.SupabaseSync.saveResidentDirect(resident);
+    }
     if (window.CloudSync && typeof window.CloudSync.saveResidentDirect === 'function') {
       window.CloudSync.saveResidentDirect(resident);
     }
@@ -5296,6 +5336,7 @@ const App = {
   },
 
   openAddFamilyMemberModal() {
+    this.getCurrentResident();
     const form = document.getElementById('formAnggotaKeluarga');
     if (form) form.reset();
     document.getElementById('familyMemberId').value = '';
@@ -5306,7 +5347,7 @@ const App = {
   },
 
   editFamilyMember(memberId) {
-    const resident = (this.data.residents || []).find(r => r.id === AppState.currentResidentId);
+    const resident = this.getCurrentResident();
     if (!resident) return;
     const member = (resident.familyMembers || []).find(m => m.id === memberId);
     if (!member) return;
@@ -5337,9 +5378,9 @@ const App = {
 
   async saveFamilyMemberSubmit(event) {
     event.preventDefault();
-    const resident = (this.data.residents || []).find(r => r.id === AppState.currentResidentId);
+    const resident = this.getCurrentResident();
     if (!resident) {
-      alert("Sesi warga tidak aktif!");
+      alert("Sesi warga tidak aktif! Silakan muat ulang halaman.");
       return;
     }
 
@@ -5394,7 +5435,10 @@ const App = {
     this.renderResidents();
     alert("✅ Data anggota keluarga berhasil disimpan!");
 
-    // Sync direct ke Google Sheets & Google Drive
+    // Sync direct ke Supabase & Google Sheets
+    if (window.SupabaseSync && typeof window.SupabaseSync.saveResidentDirect === 'function') {
+      window.SupabaseSync.saveResidentDirect(resident);
+    }
     if (window.CloudSync && typeof window.CloudSync.saveResidentDirect === 'function') {
       const success = await window.CloudSync.saveResidentDirect(resident);
       if (success) {
@@ -5405,7 +5449,7 @@ const App = {
   },
 
   deleteFamilyMember(memberId) {
-    const resident = (this.data.residents || []).find(r => r.id === AppState.currentResidentId);
+    const resident = this.getCurrentResident();
     if (!resident) return;
     const member = (resident.familyMembers || []).find(m => m.id === memberId);
     if (!member) return;
@@ -5422,7 +5466,10 @@ const App = {
     resident.familyMembers = resident.familyMembers.filter(m => m.id !== memberId);
     resident.jumlahAnggota = resident.familyMembers.length;
     DB.save(this.data);
-    // Sync updated resident to Google Sheets
+    // Sync direct ke Supabase & Google Sheets
+    if (window.SupabaseSync && typeof window.SupabaseSync.saveResidentDirect === 'function') {
+      window.SupabaseSync.saveResidentDirect(resident);
+    }
     if (window.CloudSync && typeof window.CloudSync.saveResidentDirect === 'function') {
       window.CloudSync.saveResidentDirect(resident);
     }
@@ -5544,7 +5591,7 @@ const App = {
   },
 
   renderWargaIuranHistory() {
-    const resident = (this.data.residents || []).find(r => r.id === AppState.currentResidentId) || this.data.residents[0];
+    const resident = this.getCurrentResident();
     const matrixContainer = document.getElementById('wargaPersonalMatrixBody');
     const txContainer = document.getElementById('wargaPersonalTxBody');
     if (!resident) return;
@@ -5790,7 +5837,7 @@ const App = {
   },
 
   async submitKonfirmasiWarga() {
-    const resident = (this.data.residents || []).find(r => r.id === AppState.currentResidentId) || this.data.residents[0];
+    const resident = this.getCurrentResident();
     if (!resident) {
       alert("Akun warga tidak ditemukan.");
       return;
@@ -5875,7 +5922,10 @@ const App = {
     this.data.transactions.unshift(newTx);
     DB.save(this.data);
 
-    // Kirim sinkronisasi langsung
+    // Kirim sinkronisasi langsung ke Supabase & Google Sheets
+    if (window.SupabaseSync && typeof window.SupabaseSync.saveTransactionDirect === 'function') {
+      window.SupabaseSync.saveTransactionDirect(newTx);
+    }
     if (window.CloudSync && typeof window.CloudSync.saveTransactionDirect === 'function') {
       window.CloudSync.saveTransactionDirect(newTx);
     } else if (window.CloudSync && typeof window.CloudSync.syncNow === 'function') {
@@ -5901,7 +5951,7 @@ const App = {
   },
 
   previewWargaPendingBukti(year, month) {
-    const resident = (this.data.residents || []).find(r => r.id === AppState.currentResidentId) || this.data.residents[0];
+    const resident = this.getCurrentResident();
     if (!resident) return;
     const yNum = Number(year);
     const mNum = Number(month);
