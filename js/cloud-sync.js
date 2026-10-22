@@ -145,12 +145,31 @@ const CloudSync = {
   openSyncModal(scope = null) {
     const targetScope = scope || (window.AppState && window.AppState.currentRole === 'admin_masjid' ? 'masjid' : 'rt');
     this.currentScope = targetScope;
-    this.switchScopeUI(targetScope);
+    try {
+      this.switchScopeUI(targetScope);
+    } catch (e) {
+      console.warn("switchScopeUI error:", e);
+    }
     if (window.SupabaseSync && typeof window.SupabaseSync.updateStatusUI === 'function') {
-      window.SupabaseSync.updateStatusUI();
+      try {
+        window.SupabaseSync.updateStatusUI();
+      } catch (e) {
+        console.warn("SupabaseSync.updateStatusUI error:", e);
+      }
+    }
+    if (window.SupabaseSync && typeof window.SupabaseSync.switchProviderTab === 'function') {
+      try {
+        window.SupabaseSync.switchProviderTab('supabase');
+      } catch (e) {}
     }
     if (window.App && typeof window.App.openModal === 'function') {
       window.App.openModal('modalCloudSync');
+    } else {
+      const modal = document.getElementById('modalCloudSync');
+      if (modal) {
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+      }
     }
   },
 
@@ -229,8 +248,15 @@ const CloudSync = {
     const headerStatus = this.status[headerScope] || 'disconnected';
 
     // 1. Header Pill Update: Beri prioritas ke Supabase jika aktif
-    if (window.SupabaseSync && window.SupabaseSync.isConfigured()) {
-      window.SupabaseSync.updateStatusUI();
+    const isSupabaseReady = window.SupabaseSync && (
+      typeof window.SupabaseSync.isConfigured === 'function'
+        ? window.SupabaseSync.isConfigured()
+        : (window.SupabaseSync.status === 'connected' || window.SupabaseSync.status === 'syncing')
+    );
+    if (isSupabaseReady) {
+      if (typeof window.SupabaseSync.updateStatusUI === 'function') {
+        window.SupabaseSync.updateStatusUI();
+      }
     } else {
       const cloudPill = document.getElementById('cloudSyncPill');
       const cloudDot = document.getElementById('cloudSyncDot');
