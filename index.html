@@ -210,6 +210,7 @@
             <span class="pengurus-only">Dashboard Admin</span>
             <span class="petugas-only" style="display: none;">Dashboard Petugas</span>
             <span class="warga-only">Dashboard Warga</span>
+            <span class="masjid-only" style="display: none;">Grafik Kas Masjid</span>
           </a>
         </li>
 
@@ -322,14 +323,6 @@
           <a class="nav-link" data-tab="masjid-dashboard" style="color: #047857; font-weight: 600;" title="Buka Dashboard Keuangan Masjid Sabilillah">
             <span style="font-size: 16px; margin-right: 4px;">🕌</span>
             <span>Masjid Sabilillah</span>
-          </a>
-        </li>
-
-        <!-- Quick Switch for Admin Masjid to view RT Dashboard -->
-        <li class="nav-item masjid-only" style="display: none;">
-          <a class="nav-link" data-tab="dashboard" style="color: #0369a1; font-weight: 600;" title="Lihat Dashboard Lingkungan RT">
-            <span style="font-size: 16px; margin-right: 4px;">🏠</span>
-            <span>Dashboard Lingkungan RT</span>
           </a>
         </li>
       </ul>
@@ -455,10 +448,18 @@
               <h1 class="page-title" id="dashboardMainTitle">Buku Kas & Transaksi</h1>
               <p class="page-subtitle" id="dashboardMainSubtitle">Ringkasan arus kas keuangan dan status iuran lingkungan <span class="display-rt-name">RT</span> <span class="display-perumahan"></span></p>
             </div>
-            <div style="display: flex; gap: 10px;">
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
               <button class="btn-teal-pill pengurus-only" onclick="App.openModal('modalCatatKas')">
                 <svg viewBox="0 0 24 24" fill="none"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 <span>Catat Transaksi</span>
+              </button>
+              <button class="btn-teal-pill masjid-only" style="display: none; background: #047857;" onclick="App.openCatatKasMasjidModal('masuk')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <span>+ Catat Infaq / Donasi</span>
+              </button>
+              <button class="btn-outline-pill masjid-only" style="display: none; color: #be123c; border-color: #fca5a5; background: #fff1f2;" onclick="App.openCatatKasMasjidModal('keluar')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <span>- Catat Pengeluaran</span>
               </button>
               <button class="btn-teal-pill btn-download-report">
                 <svg viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -534,7 +535,7 @@
           </div>
 
           <!-- Two-Column Bottom Dashboard Section (Matching Mockup layout) -->
-          <div class="bottom-dashboard-grid">
+          <div class="bottom-dashboard-grid pengurus-petugas-only">
             
             <!-- Left Column: Recent Transactions List (like "Arriving today") -->
             <div class="activity-card">
@@ -1117,7 +1118,7 @@
                   Rp 0
                 </div>
                 <div style="font-size: 12.5px; color: #d1fae5; margin-top: 4px; display: flex; align-items: center; gap: 8px;">
-                  <span>Rekening BSI: <strong id="dkmHeroRekening">712-345-6789</strong> a.n DKM Masjid Sabilillah</span>
+                  <span>💳 Infaq Resmi: <strong id="dkmHeroRekening">BSI 712-345-6789 a.n DKM Masjid Sabilillah</strong></span>
                 </div>
               </div>
               <div style="background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(8px); padding: 12px 18px; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.2); text-align: right;">
@@ -1233,21 +1234,29 @@
             <!-- Widget Rute Kotak Keliling Ahad & Info DKM -->
             <div style="display: flex; flex-direction: column; gap: 16px;">
               <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.02);">
-                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
-                  <span style="font-size: 24px;">📦</span>
-                  <div>
-                    <h4 style="font-size: 14px; font-weight: 800; color: #1e293b; margin: 0;">Kotak Jariyah Keliling Ahad</h4>
-                    <span style="font-size: 11px; color: #64748b;">Setiap hari Minggu pagi (07:00 - 09:30)</span>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 8px;">
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 24px;">📦</span>
+                    <div>
+                      <h4 id="dkmJariyahJudul" style="font-size: 14px; font-weight: 800; color: #1e293b; margin: 0;">Kotak Jariyah Keliling Ahad</h4>
+                      <span id="dkmJariyahWaktu" style="font-size: 11px; color: #64748b;">Setiap hari Minggu pagi (07.00 - 08.30)</span>
+                    </div>
                   </div>
+                  <button type="button" class="btn-outline-pill" style="font-size: 11px; padding: 3px 8px; color: #047857; border-color: #a7f3d0;" onclick="App.openEditJariyahModal()" title="Edit informasi Kotak Jariyah Ahad">
+                    ✏️ Edit
+                  </button>
                 </div>
-                <p style="font-size: 12px; color: #475569; line-height: 1.5; margin: 0 0 10px 0;">
+                <p id="dkmJariyahDeskripsi" style="font-size: 12px; color: #475569; line-height: 1.5; margin: 0 0 10px 0;">
                   Program rutin jemput jariyah warga lingkungan perumahan untuk operasional masjid & santunan dhuafa.
                 </p>
                 <div style="background: #f0fdfa; border: 1px solid #ccfbf1; border-radius: 10px; padding: 10px 12px; font-size: 12px; color: #0f766e;">
-                  <div>📅 <strong>Jadwal Ahad Terdekat:</strong> Tiap Ahad Pagi</div>
-                  <div style="margin-top: 4px;">🚶‍♂️ <strong>Rute & Petugas:</strong> Bpk. Subur & Bpk. Warsito (Blok A, B, C, D)</div>
+                  <div>📅 <strong>Jadwal Ahad Terdekat:</strong> <span id="dkmJariyahJadwal">Tiap Ahad Pagi</span></div>
+                  <div style="margin-top: 4px;">🚶‍♂️ <strong>Rute & Petugas:</strong> <span id="dkmJariyahPetugas">Bpk. Subur & Bpk. Warsito (Blok A, B, C, D)</span></div>
                 </div>
-                <div style="margin-top: 10px; text-align: right;">
+                <div style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
+                  <button type="button" class="btn-outline-pill" style="font-size: 11px; padding: 5px 10px; color: #047857; border-color: #a7f3d0;" onclick="App.openEditJariyahModal()">
+                    ✏️ Edit Info Program
+                  </button>
                   <button type="button" class="btn-teal-pill" style="font-size: 11.5px; padding: 5px 12px; background: #047857;" onclick="App.openCatatKasMasjidModal('masuk', 'Kotak Jariyah Keliling Ahad')">
                     + Input Perolehan Ahad
                   </button>
@@ -1256,8 +1265,13 @@
 
               <!-- Kontak & Pengurus DKM -->
               <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px 18px;">
-                <div style="font-size: 12px; font-weight: 800; color: #334155; text-transform: uppercase; margin-bottom: 8px;">
-                  Struktur DKM Masjid Sabilillah
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                  <div style="font-size: 12px; font-weight: 800; color: #334155; text-transform: uppercase;">
+                    Struktur DKM Masjid Sabilillah
+                  </div>
+                  <button type="button" class="btn-outline-pill" style="font-size: 10.5px; padding: 2px 7px; color: #475569;" onclick="App.openPengaturanMasjidModal()" title="Edit Struktur DKM">
+                    ✏️ Edit
+                  </button>
                 </div>
                 <div style="font-size: 12px; color: #475569; line-height: 1.7;">
                   <div>• Ketua DKM: <strong id="dkmDisplayKetua">H. Ahmad Fauzi</strong></div>
@@ -1647,7 +1661,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
       <span>Mading</span>
     </div>
-    <div class="bottom-nav-item active" data-tab="dashboard">
+    <div class="bottom-nav-item pengurus-petugas-only active" data-tab="dashboard">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
       <span>Dashboard</span>
     </div>
@@ -2862,6 +2876,38 @@
             </div>
           </div>
 
+          <!-- Pengaturan Program Kotak Jariyah Keliling Ahad -->
+          <div style="margin-top: 14px; padding-top: 14px; border-top: 1px solid #e2e8f0;">
+            <div style="font-size: 13px; font-weight: 800; color: #047857; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+              <span>📦</span>
+              <span>Informasi Program Kotak Jariyah Keliling Ahad</span>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Nama / Judul Program</label>
+                <input type="text" id="settingMasjidJariyahJudul" class="form-control" placeholder="Kotak Jariyah Keliling Ahad">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Hari & Jam Rutin</label>
+                <input type="text" id="settingMasjidJariyahWaktu" class="form-control" placeholder="Setiap hari Minggu pagi (07.00 - 08.30)">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Deskripsi / Peruntukan Program</label>
+              <textarea id="settingMasjidJariyahDeskripsi" class="form-control" rows="2" placeholder="Program rutin jemput jariyah warga lingkungan perumahan untuk operasional masjid & santunan dhuafa."></textarea>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Jadwal Ahad Terdekat</label>
+                <input type="text" id="settingMasjidJariyahJadwal" class="form-control" placeholder="Tiap Ahad Pagi">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Rute & Nama Petugas Keliling</label>
+                <input type="text" id="settingMasjidJariyahPetugas" class="form-control" placeholder="Bpk. Subur & Bpk. Warsito (Blok A, B, C, D)">
+              </div>
+            </div>
+          </div>
+
           <!-- Danger Zone: Reset Data Masjid -->
           <div style="margin-top: 18px; padding: 12px 14px; background: #fff5f5; border: 1px dashed #fca5a5; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
             <div>
@@ -2876,6 +2922,54 @@
         <div class="modal-footer">
           <button type="button" class="btn-outline-pill btn-close-modal">Batal</button>
           <button type="submit" class="btn-teal-pill" style="background: #047857;">Simpan Pengaturan DKM</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       MODAL: EDIT INFORMASI PROGRAM KOTAK JARIYAH KELILING AHAD
+       ======================================================================== -->
+  <div class="modal-overlay" id="modalEditJariyahAhad">
+    <div class="modal-card" style="max-width: 540px;">
+      <div class="modal-header">
+        <h3 class="modal-title" style="display: flex; align-items: center; gap: 8px;">
+          <span>📦</span>
+          <span>Edit Informasi Kotak Jariyah Keliling Ahad</span>
+        </h3>
+        <button class="btn-close-modal">&times;</button>
+      </div>
+      <form onsubmit="App.saveEditJariyahAhad(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Nama / Judul Program *</label>
+            <input type="text" id="editJariyahJudul" class="form-control" placeholder="Kotak Jariyah Keliling Ahad" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Hari & Jam Rutin *</label>
+            <input type="text" id="editJariyahWaktu" class="form-control" placeholder="Contoh: Setiap hari Minggu pagi (07.00 - 08.30)" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Deskripsi Program *</label>
+            <textarea id="editJariyahDeskripsi" class="form-control" rows="3" placeholder="Program rutin jemput jariyah warga lingkungan perumahan untuk operasional masjid & santunan dhuafa." required></textarea>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Jadwal Ahad Terdekat *</label>
+              <input type="text" id="editJariyahJadwal" class="form-control" placeholder="Contoh: Tiap Ahad Pagi" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Rute & Nama Petugas Keliling *</label>
+              <input type="text" id="editJariyahPetugas" class="form-control" placeholder="Contoh: Bpk. Subur & Bpk. Warsito (Blok A, B, C, D)" required>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-outline-pill btn-close-modal">Batal</button>
+          <button type="submit" class="btn-teal-pill" style="background: #047857;">💾 Simpan Pembaruan</button>
         </div>
       </form>
     </div>
@@ -2953,10 +3047,10 @@
   </div>
 
   <!-- Scripts with cache-busting -->
-  <script src="js/data.js?v=20261021_14"></script>
-  <script src="js/cloud-sync.js?v=20261021_14"></script>
-  <script src="js/report-pdf.js?v=20261021_14"></script>
-  <script src="js/app.js?v=20261021_14"></script>
+  <script src="js/data.js?v=20261022_01"></script>
+  <script src="js/cloud-sync.js?v=20261022_01"></script>
+  <script src="js/report-pdf.js?v=20261022_01"></script>
+  <script src="js/app.js?v=20261022_01"></script>
 
   <script>
     // Set default date picker values to today (bulletproof ready check)
