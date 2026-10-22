@@ -212,9 +212,13 @@ const App = {
     // Download / Cetak Report Buttons
     document.querySelectorAll('.btn-download-report').forEach(btn => {
       btn.addEventListener('click', () => {
-        const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
-        const curMName = monthNames[(AppState.selectedMonth || (new Date().getMonth() + 1)) - 1];
-        ReportGenerator.openReportPreview(`${curMName} ${AppState.selectedYear}`);
+        if (AppState.currentRole === 'admin_masjid') {
+          App.printLaporanMadingJumat();
+        } else {
+          const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+          const curMName = monthNames[(AppState.selectedMonth || (new Date().getMonth() + 1)) - 1];
+          ReportGenerator.openReportPreview(`${curMName} ${AppState.selectedYear}`);
+        }
       });
     });
 
@@ -6245,17 +6249,29 @@ const App = {
   },
 
   renderMasjidLaporan() {
+    const localData = DB.load();
+    if (localData) {
+      if (localData.masjidSettings) this.data.masjidSettings = localData.masjidSettings;
+      if (Array.isArray(localData.masjidTransactions)) this.data.masjidTransactions = localData.masjidTransactions;
+      if (Array.isArray(localData.masjidAssets)) this.data.masjidAssets = localData.masjidAssets;
+    }
     const s = this.data.masjidSettings || {};
     const txs = this.data.masjidTransactions || [];
-    const periodeSelect = document.getElementById('masjidLaporanPeriodeSelect')?.value || 'pekan_ini';
+    const periodeSelect = document.getElementById('masjidLaporanPeriodeSelect')?.value || 'bulan_ini';
 
     // Update Kop & Signatures
     const elNama = document.getElementById('madingNamaMasjid');
-    if (elNama) elNama.textContent = `DEWAN KEMAKMURAN MASJID (DKM) ${s.nama || 'MASJID SABILILLAH'}`.toUpperCase();
+    if (elNama) elNama.textContent = `DEWAN KEMAKMURAN MASJID (DKM) ${s.nama || s.namaMasjid || 'MASJID SABILILLAH'}`.toUpperCase();
     const elAlamat = document.getElementById('madingAlamatMasjid');
-    if (elAlamat) elAlamat.textContent = s.alamat || '';
+    if (elAlamat) elAlamat.textContent = s.alamat || 'Perumahan Tiara Candi 3';
     const elRek = document.getElementById('madingRekeningMasjid');
-    if (elRek) elRek.textContent = `Rekening Infaq Resmi ${s.bank || 'BSI'}: ${s.noRekening || ''} a.n ${s.atasNama || 'DKM Masjid Sabilillah'}`;
+    if (elRek) {
+      const rawRek = s.noRekening || s.nomorRekening || 'BSI 712-345-6789 a.n DKM Masjid Sabilillah';
+      const cleanRek = rawRek.replace(/(BSI\s*)+/gi, 'BSI ')
+                             .replace(/(\s*a\.n\s+DKM)+/gi, ' a.n DKM')
+                             .replace(/\s+/g, ' ').trim();
+      elRek.textContent = `Rekening Infaq Resmi: ${cleanRek}`;
+    }
 
     const elTtdKetua = document.getElementById('madingTtdKetua');
     if (elTtdKetua) elTtdKetua.textContent = s.ketuaDkm || 'H. Ahmad Fauzi';
@@ -6267,34 +6283,60 @@ const App = {
     const elTglTtd = document.getElementById('madingTglTtd');
     if (elTglTtd) elTglTtd.textContent = `Depok, ${today.toLocaleDateString('id-ID', dateStrOptions)}`;
 
-    // Filter Transactions by Periode
-    let filtered = [...txs];
-    const elPeriodeText = document.getElementById('madingPeriodeText');
+    // Filter Transactions by Periode & Calculate Accurate Saldo Awal
+    const masterSaldoAwal = Number(s.saldoAwal || 0);
+    let startDate = null;
+    let endDate = null;
+    let periodeLabel = '';
+
+    const curYear = today.getFullYear();
+    const curMonth = today.getMonth() + 1;
+    const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
 
     if (periodeSelect === 'pekan_ini') {
-      // 7 days back from now
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(today.getDate() - 7);
-      const dateLimit = sevenDaysAgo.toISOString().slice(0, 10);
-      filtered = txs.filter(t => (t.tanggal || '') >= dateLimit);
-      if (elPeriodeText) {
-        elPeriodeText.textContent = `Periode: Pekan Berjalan (7 Hari Terakhir s/d ${today.toLocaleDateString('id-ID', dateStrOptions)})`;
-      }
+      startDate = sevenDaysAgo.toISOString().slice(0, 10);
+      endDate = today.toISOString().slice(0, 10);
+      periodeLabel = `Periode: Pekan Berjalan (${sevenDaysAgo.toLocaleDateString('id-ID', dateStrOptions)} s/d ${today.toLocaleDateString('id-ID', dateStrOptions)})`;
     } else if (periodeSelect === 'bulan_ini') {
-      const curMonthPrefix = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-      filtered = txs.filter(t => (t.tanggal || '').startsWith(curMonthPrefix));
-      const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
-      if (elPeriodeText) {
-        elPeriodeText.textContent = `Periode: Bulan ${monthNames[today.getMonth()]} ${today.getFullYear()}`;
-      }
+      startDate = `${curYear}-${String(curMonth).padStart(2, '0')}-01`;
+      const lastDay = new Date(curYear, curMonth, 0).getDate();
+      endDate = `${curYear}-${String(curMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+      periodeLabel = `Periode: Bulan ${monthNames[curMonth - 1]} ${curYear}`;
     } else {
-      if (elPeriodeText) {
-        elPeriodeText.textContent = `Periode: Keseluruhan Buku Kas Masjid`;
-      }
+      // 'semua'
+      startDate = null;
+      endDate = null;
+      periodeLabel = `Periode: Keseluruhan Buku Kas Masjid (Semua Transaksi)`;
     }
 
-    // Calculate Balances
-    const saldoAwal = Number(s.saldoAwal || 0);
+    const elPeriodeText = document.getElementById('madingPeriodeText');
+    if (elPeriodeText) elPeriodeText.textContent = periodeLabel;
+
+    let filtered = [];
+    let priorMasuk = 0;
+    let priorKeluar = 0;
+
+    txs.forEach(t => {
+      const tgl = t.tanggal || '';
+      const nom = Number(t.nominal || 0);
+
+      if (startDate && tgl < startDate) {
+        // Transaksi sebelum periode berjalan -> diakumulasikan ke Saldo Awal periode!
+        if (t.tipe === 'masuk') priorMasuk += nom;
+        else priorKeluar += nom;
+      } else if (!endDate || (tgl <= endDate && (!startDate || tgl >= startDate))) {
+        // Transaksi dalam periode berjalan
+        filtered.push(t);
+      }
+    });
+
+    const calculatedSaldoAwal = masterSaldoAwal + priorMasuk - priorKeluar;
+
+    // Urutkan transaksi laporan secara kronologis tanggal
+    filtered.sort((a, b) => new Date(a.tanggal || 0) - new Date(b.tanggal || 0));
+
     let totalMasuk = 0;
     let totalKeluar = 0;
     const listMasuk = [];
@@ -6311,22 +6353,12 @@ const App = {
       }
     });
 
-    // Calculate Overall Kantong Saldo for specific kantong footer
-    let totalPembangunan = 0;
-    let totalSosial = 0;
-    txs.forEach(t => {
-      const nom = Number(t.nominal || 0);
-      if (t.kantong === 'Pembangunan') {
-        totalPembangunan += (t.tipe === 'masuk' ? nom : -nom);
-      } else if (t.kantong === 'Sosial & ZIS') {
-        totalSosial += (t.tipe === 'masuk' ? nom : -nom);
-      }
-    });
+    // Saldo akhir = calculatedSaldoAwal + totalMasuk - totalKeluar
+    const saldoAkhir = calculatedSaldoAwal + totalMasuk - totalKeluar;
 
-    const saldoAkhir = (periodeSelect === 'semua' ? saldoAwal : 0) + totalMasuk - totalKeluar;
-
+    // Update Saldo Cards
     const elSaldoAwal = document.getElementById('madingSaldoAwal');
-    if (elSaldoAwal) elSaldoAwal.textContent = Utils.formatRupiah(periodeSelect === 'semua' ? saldoAwal : 0);
+    if (elSaldoAwal) elSaldoAwal.textContent = Utils.formatRupiah(calculatedSaldoAwal);
     const elTotMasuk = document.getElementById('madingTotalMasuk');
     if (elTotMasuk) elTotMasuk.textContent = Utils.formatRupiah(totalMasuk);
     const elTotKeluar = document.getElementById('madingTotalKeluar');
@@ -6338,6 +6370,18 @@ const App = {
     if (elSubIn) elSubIn.textContent = `Subtotal: ${Utils.formatRupiah(totalMasuk)}`;
     const elSubOut = document.getElementById('madingSubtotalOut');
     if (elSubOut) elSubOut.textContent = `Subtotal: ${Utils.formatRupiah(totalKeluar)}`;
+
+    // Saldo Kantong Khusus (Akumulasi keseluruhan hingga saat ini)
+    let totalPembangunan = 0;
+    let totalSosial = 0;
+    txs.forEach(t => {
+      const nom = Number(t.nominal || 0);
+      if (t.kantong === 'Pembangunan') {
+        totalPembangunan += (t.tipe === 'masuk' ? nom : -nom);
+      } else if (t.kantong === 'Sosial & ZIS') {
+        totalSosial += (t.tipe === 'masuk' ? nom : -nom);
+      }
+    });
 
     const elKhususPembangunan = document.getElementById('madingKhususPembangunan');
     if (elKhususPembangunan) elKhususPembangunan.textContent = Utils.formatRupiah(totalPembangunan);
@@ -6716,6 +6760,9 @@ const App = {
     const waIn = document.getElementById('settingMasjidWa');
     if (waIn) waIn.value = s.teleponWa || s.contactWa || '';
 
+    const saldoAwalIn = document.getElementById('settingMasjidSaldoAwal');
+    if (saldoAwalIn) saldoAwalIn.value = s.saldoAwal || 0;
+
     // Prefill Jariyah Ahad form inputs
     const jJudulIn = document.getElementById('settingMasjidJariyahJudul');
     if (jJudulIn) jJudulIn.value = s.jariyahJudul || 'Kotak Jariyah Keliling Ahad';
@@ -6751,6 +6798,11 @@ const App = {
     }
     s.teleponWa = document.getElementById('settingMasjidWa')?.value.trim() || s.teleponWa;
     s.contactWa = s.teleponWa;
+
+    const rawSaldoAwal = document.getElementById('settingMasjidSaldoAwal')?.value;
+    if (rawSaldoAwal !== undefined && rawSaldoAwal !== '') {
+      s.saldoAwal = Math.max(0, Number(rawSaldoAwal || 0));
+    }
 
     // Simpan data Jariyah Ahad jika ada input
     const jJudulIn = document.getElementById('settingMasjidJariyahJudul')?.value.trim();
@@ -6876,7 +6928,112 @@ const App = {
   },
 
   printLaporanMadingJumat() {
-    window.print();
+    // Pastikan data laporan ter-render dengan kalkulasi terbaru
+    this.renderMasjidLaporan();
+
+    const s = this.data.masjidSettings || {};
+    const printable = document.getElementById('printableMadingJumat');
+    if (!printable) {
+      window.print();
+      return;
+    }
+
+    const printWin = window.open('', '_blank');
+    if (!printWin) {
+      // Fallback jika browser memblokir pop-up
+      window.print();
+      return;
+    }
+
+    const titleDoc = `Laporan_Kas_Mading_${(s.nama || s.namaMasjid || 'Masjid_Sabilillah').replace(/\s+/g, '_')}`;
+    printWin.document.open();
+    printWin.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>${titleDoc}</title>
+        <style>
+          @page {
+            size: A4 portrait;
+            margin: 12mm 12mm 15mm 12mm;
+          }
+          * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+            background: #ffffff;
+            color: #1e293b;
+            margin: 0;
+            padding: 24px;
+            font-size: 11.5px;
+          }
+          .printable-mading-container {
+            max-width: 820px;
+            margin: 0 auto;
+            background: #ffffff;
+          }
+          .no-print {
+            display: none !important;
+          }
+          .btn-print-floating {
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            background: #047857;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 800;
+            font-size: 13px;
+            cursor: pointer;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+            z-index: 99999;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+          }
+          .btn-print-floating:hover {
+            background: #065f46;
+          }
+          @media print {
+            .btn-print-floating {
+              display: none !important;
+            }
+            body {
+              padding: 0 !important;
+            }
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+          }
+          th, td {
+            padding: 6px 8px;
+          }
+        </style>
+      </head>
+      <body>
+        <button class="btn-print-floating" onclick="window.print()">
+          🖨️ Cetak / Simpan PDF
+        </button>
+        <div class="printable-mading-container">
+          ${printable.innerHTML}
+        </div>
+        <script>
+          setTimeout(() => {
+            window.print();
+          }, 350);
+        <\/script>
+      </body>
+      </html>
+    `);
+    printWin.document.close();
   },
 
   // Reset & Kosongkan Data Masjid untuk Mencoba dari Nol
