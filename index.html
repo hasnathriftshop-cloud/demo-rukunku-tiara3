@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
   <!-- Custom Modern Stylesheet -->
-  <link rel="stylesheet" href="css/style.css?v=20261022_04">
+  <link rel="stylesheet" href="css/style.css?v=20261022_05">
 </head>
 <body>
 
@@ -585,6 +585,148 @@
               </div>
             </div>
 
+          </div>
+
+          <!-- ==================================================================
+               MODUL TRANSPARANSI KEUANGAN MASJID SABILILLAH (UNTUK WARGA)
+               Tampil di Dashboard Warga di Bawah Grafik
+               ================================================================== -->
+          <div class="warga-only" id="wargaMasjidTransparansiSection" style="display: none; margin-top: 24px;">
+            <!-- Header Kartu Transparansi Masjid -->
+            <div style="background: linear-gradient(135deg, #064e3b, #047857); border-radius: 16px; padding: 20px 24px; color: #ffffff; margin-bottom: 18px; box-shadow: 0 4px 16px rgba(4, 120, 87, 0.15);">
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+                <div>
+                  <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(255, 255, 255, 0.18); padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;">
+                    <span>🕌</span>
+                    <span>Transparansi Jemaah & Warga</span>
+                  </div>
+                  <h2 style="font-size: 20px; font-weight: 900; margin: 8px 0 2px 0; color: #ffffff; letter-spacing: -0.3px;">
+                    Laporan Keuangan Kas Masjid Sabilillah
+                  </h2>
+                  <p style="font-size: 12.5px; color: #a7f3d0; margin: 0; line-height: 1.4;">
+                    Informasi terbuka penerimaan infaq/donasi dan pengeluaran operasional DKM untuk seluruh warga lingkungan
+                  </p>
+                </div>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                  <button type="button" class="btn-outline-pill" style="background: #ffffff; color: #064e3b; border-color: #ffffff; font-weight: 700; font-size: 12px; padding: 8px 14px;" onclick="App.printLaporanMadingJumat()">
+                    <span>🖨️ Cetak / Buka Laporan Mading (PDF)</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Rekening Resmi Strip -->
+              <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.2); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; font-size: 12px; color: #ecfdf5;">
+                <div>
+                  💳 <strong>Rekening Infaq Resmi:</strong> <span id="wargaMasjidRekeningText" style="font-weight: 700; color: #fef08a;">7207571808 BSI a.n Masjid Sabilillah</span>
+                </div>
+                <div style="font-size: 11.5px; color: #d1fae5;">
+                  🕌 <strong>DKM Masjid Sabilillah</strong> • Perum Tiara Candi 3 Sekargadung
+                </div>
+              </div>
+            </div>
+
+            <!-- Filter Periode Laporan Masjid Warga -->
+            <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 18px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <span style="font-weight: 700; color: #334155; font-size: 13px;">📅 Periode Laporan:</span>
+                <select id="wargaMasjidPeriodeSelect" class="form-control" style="width: auto; height: 34px; padding: 2px 12px; font-size: 12.5px; font-weight: 600; border-radius: 8px; border: 1px solid #cbd5e1; cursor: pointer;" onchange="App.renderWargaMasjidTransparansi()">
+                  <option value="bulan_ini" selected>Bulan Berjalan</option>
+                  <option value="pekan_ini">Pekan Ini (7 Hari Terakhir / Jumat Ini)</option>
+                  <option value="semua">Semua Transaksi Kas (Keseluruhan)</option>
+                </select>
+                <span id="wargaMasjidPeriodeLabel" style="font-size: 12px; color: #0d9488; font-weight: 600;">Periode: Bulan Berjalan</span>
+              </div>
+              <div style="font-size: 11.5px; color: #64748b;">
+                Data disinkronkan langsung dari buku kas takmir DKM Masjid
+              </div>
+            </div>
+
+            <!-- Quick KPI Cards Grid Transparansi Masjid Warga -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 18px;">
+              <!-- Total Saldo Kas -->
+              <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Total Saldo Kas Masjid</div>
+                <div id="wargaMasjidSaldoTotal" style="font-size: 20px; font-weight: 900; color: #047857; margin-top: 4px;">Rp 0</div>
+                <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">Saldo Kas Umum DKM</div>
+              </div>
+
+              <!-- Pemasukan Periode Ini -->
+              <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 14px 16px;">
+                <div style="font-size: 11px; font-weight: 700; color: #166534; text-transform: uppercase;">Penerimaan Kas (Infaq/Donasi)</div>
+                <div id="wargaMasjidTotalMasuk" style="font-size: 20px; font-weight: 900; color: #15803d; margin-top: 4px;">+Rp 0</div>
+                <div style="font-size: 11px; color: #166534; margin-top: 2px;">Infaq Jumat, Kotak, & Donasi Warga</div>
+              </div>
+
+              <!-- Pengeluaran Periode Ini -->
+              <div style="background: #fff1f2; border: 1px solid #fecdd3; border-radius: 12px; padding: 14px 16px;">
+                <div style="font-size: 11px; font-weight: 700; color: #9f1239; text-transform: uppercase;">Pengeluaran Operasional</div>
+                <div id="wargaMasjidTotalKeluar" style="font-size: 20px; font-weight: 900; color: #be123c; margin-top: 4px;">-Rp 0</div>
+                <div style="font-size: 11px; color: #9f1239; margin-top: 2px;">Listrik, Kebersihan, Honor Marbot/Imam</div>
+              </div>
+
+              <!-- Kotak Jariyah Ahad -->
+              <div style="background: #fefce8; border: 1px solid #fef08a; border-radius: 12px; padding: 14px 16px;">
+                <div style="font-size: 11px; font-weight: 700; color: #854d0e; text-transform: uppercase;">Kotak Jariyah Ahad (Bulan Ini)</div>
+                <div id="wargaMasjidKotakAhad" style="font-size: 20px; font-weight: 900; color: #a16207; margin-top: 4px;">Rp 0</div>
+                <div style="font-size: 11px; color: #854d0e; margin-top: 2px;">Hasil jemputan keliling perumahan</div>
+              </div>
+            </div>
+
+            <!-- Dana Khusus (Pembangunan & Sosial/ZIS) -->
+            <div class="warga-masjid-special-grid">
+              <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between;">
+                <div>
+                  <span style="font-size: 11px; font-weight: 700; color: #92400e; text-transform: uppercase;">🏗️ Dana Wakaf & Pembangunan:</span>
+                  <div style="font-size: 11.5px; color: #b45309; margin-top: 2px;">Renovasi tempat wudhu, kubah & sarana</div>
+                </div>
+                <div id="wargaMasjidSaldoPembangunan" style="font-size: 16px; font-weight: 800; color: #b45309;">Rp 0</div>
+              </div>
+              <div style="background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 10px; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between;">
+                <div>
+                  <span style="font-size: 11px; font-weight: 700; color: #6b21a8; text-transform: uppercase;">🤝 Dana Sosial & Santunan (ZIS):</span>
+                  <div style="font-size: 11.5px; color: #7e22ce; margin-top: 2px;">Santunan anak yatim & bantuan dhuafa warga</div>
+                </div>
+                <div id="wargaMasjidSaldoSosial" style="font-size: 16px; font-weight: 800; color: #7e22ce;">Rp 0</div>
+              </div>
+            </div>
+
+            <!-- Tabel Transparansi Kas Masuk & Keluar Masjid -->
+            <div class="data-table-container">
+              <div style="padding: 14px 18px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <div>
+                  <h3 style="font-size: 14px; font-weight: 800; color: #1e293b; margin: 0;">Rincian Transaksi Kas Masuk & Keluar Masjid</h3>
+                  <span style="font-size: 11.5px; color: #64748b;">Daftar transaksi kas masjid pada periode terpilih</span>
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                  <select id="wargaMasjidFilterTipe" class="form-control" style="width: auto; height: 32px; font-size: 11.5px; padding: 2px 8px;" onchange="App.renderWargaMasjidTransparansi()">
+                    <option value="all">Semua Aliran Kas</option>
+                    <option value="masuk">Kas Masuk Saja</option>
+                    <option value="keluar">Kas Keluar Saja</option>
+                  </select>
+                  <input type="text" id="wargaMasjidSearch" class="form-control" style="width: 180px; height: 32px; font-size: 11.5px; padding: 2px 10px;" placeholder="Cari uraian / donatur..." oninput="App.renderWargaMasjidTransparansi()">
+                </div>
+              </div>
+              <div style="overflow-x: auto;">
+                <table class="app-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 40px; text-align: center;">No</th>
+                      <th>Tanggal</th>
+                      <th>Aliran & Kantong</th>
+                      <th>Kategori</th>
+                      <th>Uraian / Keterangan</th>
+                      <th>Donatur / Penerima</th>
+                      <th style="text-align: right;">Nominal</th>
+                      <th>Metode</th>
+                      <th style="text-align: center;">Kwitansi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="wargaMasjidTableBody">
+                    <!-- Populated dynamically by App.renderWargaMasjidTransparansi() -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
 
         </section>
@@ -3036,10 +3178,10 @@
   </div>
 
   <!-- Scripts with cache-busting -->
-  <script src="js/data.js?v=20261022_04"></script>
-  <script src="js/cloud-sync.js?v=20261022_04"></script>
-  <script src="js/report-pdf.js?v=20261022_04"></script>
-  <script src="js/app.js?v=20261022_04"></script>
+  <script src="js/data.js?v=20261022_05"></script>
+  <script src="js/cloud-sync.js?v=20261022_05"></script>
+  <script src="js/report-pdf.js?v=20261022_05"></script>
+  <script src="js/app.js?v=20261022_05"></script>
 
   <script>
     // Set default date picker values to today (bulletproof ready check)
