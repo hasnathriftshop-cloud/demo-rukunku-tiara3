@@ -5957,10 +5957,12 @@ const App = {
     let totalPembangunan = 0;
     let totalSosial = 0;
     let totalInfaqJumatBulanIni = 0;
-    let totalKotakAhad = 0;
+    let totalKotakAhadBulanIni = 0;
 
     const now = new Date();
     const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+    const curMonthName = monthNames[now.getMonth()];
     let monthIn = 0;
     let monthOut = 0;
 
@@ -5992,8 +5994,9 @@ const App = {
       if (isMasuk && (t.kategori === 'Infaq Jumat' || (t.uraian && t.uraian.toLowerCase().includes('jumat')))) {
         if (isThisMonth) totalInfaqJumatBulanIni += nominal;
       }
+      // Kotak Jariyah Keliling Ahad: akumulasi khusus bulan berjalan (reset otomatis ke Nol saat ganti bulan)
       if (isMasuk && (t.kategori === 'Kotak Jariyah Keliling Ahad' || (t.uraian && t.uraian.toLowerCase().includes('ahad')))) {
-        totalKotakAhad += nominal;
+        if (isThisMonth) totalKotakAhadBulanIni += nominal;
       }
     });
 
@@ -6002,7 +6005,10 @@ const App = {
     if (elHeroSaldo) elHeroSaldo.textContent = Utils.formatRupiah(totalKasUmum);
 
     const elHeroKotakAhad = document.getElementById('masjidHeroKotakAhad');
-    if (elHeroKotakAhad) elHeroKotakAhad.textContent = Utils.formatRupiah(totalKotakAhad);
+    if (elHeroKotakAhad) elHeroKotakAhad.textContent = Utils.formatRupiah(totalKotakAhadBulanIni);
+
+    const elHeroKotakAhadLabel = document.getElementById('masjidHeroKotakAhadLabel');
+    if (elHeroKotakAhadLabel) elHeroKotakAhadLabel.textContent = `Kotak Jariyah Ahad (${curMonthName}):`;
 
     const elKpiPembangunan = document.getElementById('masjidKpiPembangunan');
     if (elKpiPembangunan) elKpiPembangunan.textContent = Utils.formatRupiah(totalPembangunan);
@@ -6263,13 +6269,11 @@ const App = {
     const elNama = document.getElementById('madingNamaMasjid');
     if (elNama) elNama.textContent = `DEWAN KEMAKMURAN MASJID (DKM) ${s.nama || s.namaMasjid || 'MASJID SABILILLAH'}`.toUpperCase();
     const elAlamat = document.getElementById('madingAlamatMasjid');
-    if (elAlamat) elAlamat.textContent = s.alamat || 'Perumahan Tiara Candi 3';
+    if (elAlamat) elAlamat.textContent = s.alamat || 'Perumahan Tiara Candi 3 Sekargadung';
     const elRek = document.getElementById('madingRekeningMasjid');
     if (elRek) {
-      const rawRek = s.noRekening || s.nomorRekening || 'BSI 712-345-6789 a.n DKM Masjid Sabilillah';
-      const cleanRek = rawRek.replace(/(BSI\s*)+/gi, 'BSI ')
-                             .replace(/(\s*a\.n\s+DKM)+/gi, ' a.n DKM')
-                             .replace(/\s+/g, ' ').trim();
+      const rawRek = s.noRekening || s.nomorRekening || '7207571808 BSI a.n Masjid Sabilillah';
+      const cleanRek = rawRek.replace(/^rekening\s*(infaq\s*)?(resmi)?\s*[:\-]?\s*/i, '').trim();
       elRek.textContent = `Rekening Infaq Resmi: ${cleanRek}`;
     }
 
@@ -7008,6 +7012,39 @@ const App = {
               padding: 0 !important;
             }
           }
+          /* KOP MASJID - TEBAL & RATA TENGAH SEMPURNA */
+          .mading-kop {
+            text-align: center !important;
+            border-bottom: 3px double #064e3b !important;
+            padding-bottom: 12px !important;
+            margin-bottom: 18px !important;
+            width: 100% !important;
+          }
+          .mading-kop-title {
+            font-size: 18px !important;
+            font-weight: 900 !important;
+            color: #064e3b !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.5px !important;
+            text-align: center !important;
+            margin: 0 auto !important;
+          }
+          .mading-kop-sub {
+            font-size: 13px !important;
+            font-weight: 800 !important;
+            color: #1e293b !important;
+            text-align: center !important;
+            margin: 4px auto !important;
+            display: block !important;
+          }
+          .mading-kop-addr {
+            font-size: 12px !important;
+            font-weight: 800 !important;
+            color: #047857 !important;
+            text-align: center !important;
+            margin: 4px auto !important;
+            display: block !important;
+          }
           table {
             width: 100%;
             border-collapse: collapse;
@@ -7016,6 +7053,31 @@ const App = {
           th, td {
             padding: 6px 8px;
           }
+          .badge-masjid-in {
+            background: #dcfce7 !important;
+            color: #15803d !important;
+            padding: 2px 6px !important;
+            border-radius: 4px !important;
+            font-size: 10px !important;
+            font-weight: 700 !important;
+          }
+          .badge-masjid-out {
+            background: #fee2e2 !important;
+            color: #b91c1c !important;
+            padding: 2px 6px !important;
+            border-radius: 4px !important;
+            font-size: 10px !important;
+            font-weight: 700 !important;
+          }
+          .badge-kantong {
+            padding: 2px 6px !important;
+            border-radius: 4px !important;
+            font-size: 10px !important;
+            font-weight: 600 !important;
+          }
+          .badge-kantong-umum { background: #f1f5f9 !important; color: #475569 !important; }
+          .badge-kantong-pembangunan { background: #fef3c7 !important; color: #b45309 !important; }
+          .badge-kantong-sosial { background: #f3e8ff !important; color: #7e22ce !important; }
         </style>
       </head>
       <body>
