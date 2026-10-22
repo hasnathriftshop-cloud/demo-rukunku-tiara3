@@ -720,9 +720,14 @@ const DB = {
   save(data, options = {}) {
     try {
       localStorage.setItem(this.KEY, JSON.stringify(data));
-      // Auto-sync in background if Google Sheets is connected and skipSync is not set
-      if (!options.skipSync && window.CloudSync && typeof window.CloudSync.autoSyncBackground === 'function') {
-        window.CloudSync.autoSyncBackground();
+      // Auto-sync in background ke Supabase & Google Sheets jika aktif dan skipSync is not set
+      if (!options.skipSync) {
+        if (window.SupabaseSync && typeof window.SupabaseSync.autoSyncBackground === 'function') {
+          window.SupabaseSync.autoSyncBackground();
+        }
+        if (window.CloudSync && typeof window.CloudSync.autoSyncBackground === 'function') {
+          window.CloudSync.autoSyncBackground();
+        }
       }
       return true;
     } catch (e) {
