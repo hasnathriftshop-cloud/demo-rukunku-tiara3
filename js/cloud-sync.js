@@ -9,9 +9,9 @@
 
 const CloudSync = {
   // URL Web App Google Apps Script default lingkungan RT 05 / RW 02 Perum Tiara Candi 3
-  DEFAULT_GAS_URL_RT: 'https://script.google.com/macros/s/AKfycbxN-hWB9wZLcKLuUEA2dXX2D23DPrTHPYYkJwmmViq2EdFbwvg0KYEXvAUQFL1FU6JW6w/exec',
-  DEFAULT_GAS_URL_MASJID: 'https://script.google.com/macros/s/AKfycbw1GcSR545yTDc-tM71kukD3sa0_hMmbJ87kQ_wnSg9K7irKLffC6NOZKx4Beu33n3G/exec', // Dikosongkan default, diisi pengurus saat deploy Code_Masjid.gs
-  
+  DEFAULT_GAS_URL_RT: 'https://script.google.com/macros/s/AKfycbwCPlpqo5DMqRgnz1QCksWw6M3tBPwCU0-LX0iDZnZcluMN6CDo6C6qRCSOdJIfFXFJYg/exec',
+  DEFAULT_GAS_URL_MASJID: '', // Dikosongkan default, diisi pengurus saat deploy Code_Masjid.gs
+
   // Storage Keys Terpisah
   STORAGE_KEY_URL_RT: 'rukunku_gas_url',
   STORAGE_KEY_URL_MASJID: 'rukunku_masjid_gas_url',
@@ -146,6 +146,9 @@ const CloudSync = {
     const targetScope = scope || (window.AppState && window.AppState.currentRole === 'admin_masjid' ? 'masjid' : 'rt');
     this.currentScope = targetScope;
     this.switchScopeUI(targetScope);
+    if (window.SupabaseSync && typeof window.SupabaseSync.updateStatusUI === 'function') {
+      window.SupabaseSync.updateStatusUI();
+    }
     if (window.App && typeof window.App.openModal === 'function') {
       window.App.openModal('modalCloudSync');
     }
@@ -225,32 +228,52 @@ const CloudSync = {
     const headerGasUrl = this.getGasUrl(headerScope);
     const headerStatus = this.status[headerScope] || 'disconnected';
 
-    // 1. Header Pill Update
-    const cloudPill = document.getElementById('cloudSyncPill');
-    const cloudDot = document.getElementById('cloudSyncDot');
-    const cloudText = document.getElementById('cloudSyncText');
+    // 1. Header Pill Update: Beri prioritas ke Supabase jika aktif
+    if (window.SupabaseSync && window.SupabaseSync.isConfigured()) {
+      window.SupabaseSync.updateStatusUI();
+    } else {
+      const cloudPill = document.getElementById('cloudSyncPill');
+      const cloudDot = document.getElementById('cloudSyncDot');
+      const cloudText = document.getElementById('cloudSyncText');
 
-    if (cloudPill) {
-      if (!headerGasUrl) {
-        if (cloudDot) cloudDot.style.background = '#94a3b8';
-        if (cloudText) cloudText.textContent = isMasjidRole ? 'Kas Masjid: DB Lokal' : 'Mode: Database Lokal';
-        cloudPill.title = isMasjidRole
-          ? 'Database Masjid belum terhubung ke Google Sheets. Klik untuk mengonfigurasi.'
-          : 'Database RT belum terhubung ke Google Sheets. Klik untuk mengonfigurasi.';
-      } else if (headerStatus === 'syncing') {
-        if (cloudDot) cloudDot.style.background = '#f59e0b';
-        if (cloudText) cloudText.textContent = isMasjidRole ? 'Menyinkronkan Masjid...' : 'Menyinkronkan RT...';
-        cloudPill.title = 'Sedang menyinkronkan data dengan Google Sheets...';
-      } else if (headerStatus === 'connected') {
-        if (cloudDot) cloudDot.style.background = isMasjidRole ? '#059669' : '#10b981';
-        if (cloudText) cloudText.textContent = isMasjidRole ? 'Cloud Kas Masjid Aktif' : 'Google Sheet Terhubung';
-        cloudPill.title = isMasjidRole
-          ? 'Terhubung ke Google Sheets Masjid Sabilillah. Klik untuk detail / sync manual.'
-          : 'Terhubung ke Google Sheets Lingkungan RT. Klik untuk detail / sync manual.';
-      } else if (headerStatus === 'error') {
-        if (cloudDot) cloudDot.style.background = '#ef4444';
-        if (cloudText) cloudText.textContent = isMasjidRole ? 'Sync Masjid Gagal' : 'Sync RT Gagal';
-        cloudPill.title = 'Gagal berkomunikasi dengan Google Sheets. Periksa URL Anda.';
+      if (cloudPill) {
+        if (!headerGasUrl) {
+          if (cloudDot) {
+            cloudDot.style.background = '#94a3b8';
+            cloudDot.style.boxShadow = 'none';
+          }
+          if (cloudText) cloudText.textContent = isMasjidRole ? 'Kas Masjid: DB Lokal' : 'Mode: Database Lokal';
+          cloudPill.title = isMasjidRole
+            ? 'Database Masjid belum terhubung ke Cloud. Klik untuk mengonfigurasi.'
+            : 'Database RT belum terhubung ke Cloud. Klik untuk mengonfigurasi.';
+          cloudPill.style.borderColor = '';
+        } else if (headerStatus === 'syncing') {
+          if (cloudDot) {
+            cloudDot.style.background = '#f59e0b';
+            cloudDot.style.boxShadow = '0 0 8px #f59e0b';
+          }
+          if (cloudText) cloudText.textContent = isMasjidRole ? 'Menyinkronkan Masjid...' : 'Menyinkronkan RT...';
+          cloudPill.title = 'Sedang menyinkronkan data dengan Google Sheets...';
+          cloudPill.style.borderColor = '#f59e0b';
+        } else if (headerStatus === 'connected') {
+          if (cloudDot) {
+            cloudDot.style.background = isMasjidRole ? '#059669' : '#10b981';
+            cloudDot.style.boxShadow = isMasjidRole ? '0 0 8px #059669' : '0 0 8px #10b981';
+          }
+          if (cloudText) cloudText.textContent = isMasjidRole ? 'Cloud Kas Masjid Aktif' : 'Google Sheet Terhubung';
+          cloudPill.title = isMasjidRole
+            ? 'Terhubung ke Google Sheets Masjid Sabilillah. Klik untuk detail / sync manual.'
+            : 'Terhubung ke Google Sheets Lingkungan RT. Klik untuk detail / sync manual.';
+          cloudPill.style.borderColor = isMasjidRole ? '#059669' : '#10b981';
+        } else if (headerStatus === 'error') {
+          if (cloudDot) {
+            cloudDot.style.background = '#ef4444';
+            cloudDot.style.boxShadow = '0 0 8px #ef4444';
+          }
+          if (cloudText) cloudText.textContent = isMasjidRole ? 'Sync Masjid Gagal' : 'Sync RT Gagal';
+          cloudPill.title = 'Gagal berkomunikasi dengan Google Sheets. Periksa URL Anda.';
+          cloudPill.style.borderColor = '#ef4444';
+        }
       }
     }
 
