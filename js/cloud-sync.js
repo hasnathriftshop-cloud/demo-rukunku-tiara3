@@ -1,169 +1,327 @@
 /**
- * RukunKu - Google Sheets & Apps Script Cloud Sync Module
- * Enables real-time synchronization between RukunKu and Google Spreadsheet
+ * ============================================================================
+ * RukunKu - Google Sheets & Cloud Sync Module (Dual-Database Edition)
+ * Mendukung 2 Database Mandiri & Terpisah:
+ * 1. Scope 'rt'     : Data Warga, Iuran 12 Bulan, Kas RT, Petugas Blok, Setoran
+ * 2. Scope 'masjid' : Kas Masuk/Keluar Masjid Sabilillah, Kotak Amal, Inventaris Aset
+ * ============================================================================
  */
 
 const CloudSync = {
   // URL Web App Google Apps Script default lingkungan RT 05 / RW 02 Perum Tiara Candi 3
-  DEFAULT_GAS_URL: 'https://script.google.com/macros/s/AKfycbxN-hWB9wZLcKLuUEA2dXX2D23DPrTHPYYkJwmmViq2EdFbwvg0KYEXvAUQFL1FU6JW6w/exec',
+  DEFAULT_GAS_URL_RT: 'https://script.google.com/macros/s/AKfycbxN-hWB9wZLcKLuUEA2dXX2D23DPrTHPYYkJwmmViq2EdFbwvg0KYEXvAUQFL1FU6JW6w/exec',
+  DEFAULT_GAS_URL_MASJID: '', // Dikosongkan default, diisi pengurus saat deploy Code_Masjid.gs
+
+  // Storage Keys Terpisah
+  STORAGE_KEY_URL_RT: 'rukunku_gas_url',
+  STORAGE_KEY_URL_MASJID: 'rukunku_masjid_gas_url',
+  STORAGE_KEY_LAST_SYNC_RT: 'rukunku_last_sync_time',
+  STORAGE_KEY_LAST_SYNC_MASJID: 'rukunku_masjid_last_sync_time',
+
+  // Alias Kompatibilitas Legacy
   STORAGE_KEY_URL: 'rukunku_gas_url',
   STORAGE_KEY_LAST_SYNC: 'rukunku_last_sync_time',
-  
-  status: 'disconnected', // 'disconnected' | 'connected' | 'syncing' | 'error'
-  lastSyncTime: null,
-  hasPulledOnce: false,
+  DEFAULT_GAS_URL: 'https://script.google.com/macros/s/AKfycbwCPlpqo5DMqRgnz1QCksWw6M3tBPwCU0-LX0iDZnZcluMN6CDo6C6qRCSOdJIfFXFJYg/exec',
+
+  currentScope: null, // 'rt' | 'masjid' (null = otomatis deteksi role aktif)
+  status: {
+    rt: 'disconnected', // 'disconnected' | 'connected' | 'syncing' | 'error'
+    masjid: 'disconnected'
+  },
+  lastSyncTime: {
+    rt: null,
+    masjid: null
+  },
+  hasPulledOnce: {
+    rt: false,
+    masjid: false
+  },
   debounceTimer: null,
-  lastPullTimestamp: 0,
+  lastPullTimestamp: {
+    rt: 0,
+    masjid: 0
+  },
 
   init() {
-    this.lastSyncTime = localStorage.getItem(this.STORAGE_KEY_LAST_SYNC) || null;
+    this.lastSyncTime.rt = localStorage.getItem(this.STORAGE_KEY_LAST_SYNC_RT) || null;
+    this.lastSyncTime.masjid = localStorage.getItem(this.STORAGE_KEY_LAST_SYNC_MASJID) || null;
+
+    // Inisialisasi status awal berdasarkan keberadaan URL yang tersimpan
+    this.status.rt = this.getGasUrl('rt') ? 'connected' : 'disconnected';
+    this.status.masjid = this.getGasUrl('masjid') ? 'connected' : 'disconnected';
+
     this.updateStatusUI();
 
-    const gasUrl = this.getGasUrl();
-    if (gasUrl) {
-      // Auto-pull updates on startup from Google Sheets
-      this.pullFromSheets({ silent: true });
+    // Auto-pull update awal dari cloud database sesuai scope aktif saat startup
+    const activeScope = this.getActiveScope();
+    if (this.getGasUrl(activeScope)) {
+      this.pullFromSheets({ silent: true }, activeScope);
     }
 
     // Auto-refresh data saat user kembali membuka tab browser RukunKu
     window.addEventListener('focus', () => {
-      if (this.getGasUrl() && Date.now() - this.lastPullTimestamp > 5000 && this.status !== 'syncing') {
-        this.pullFromSheets({ silent: true });
+      const sc = this.getActiveScope();
+      if (this.getGasUrl(sc) && Date.now() - (this.lastPullTimestamp[sc] || 0) > 5000 && this.status[sc] !== 'syncing') {
+        this.pullFromSheets({ silent: true }, sc);
       }
     });
 
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && this.getGasUrl() && Date.now() - this.lastPullTimestamp > 5000 && this.status !== 'syncing') {
-        this.pullFromSheets({ silent: true });
+      if (document.visibilityState === 'visible') {
+        const sc = this.getActiveScope();
+        if (this.getGasUrl(sc) && Date.now() - (this.lastPullTimestamp[sc] || 0) > 5000 && this.status[sc] !== 'syncing') {
+          this.pullFromSheets({ silent: true }, sc);
+        }
       }
     });
 
     // Smart Background Polling: cek data baru dari Google Sheets setiap 25 detik saat tab aktif
     setInterval(() => {
-      if (document.visibilityState === 'visible' && this.getGasUrl() && this.status !== 'syncing' && Date.now() - this.lastPullTimestamp > 20000) {
-        this.pullFromSheets({ silent: true });
+      if (document.visibilityState === 'visible') {
+        const sc = this.getActiveScope();
+        if (this.getGasUrl(sc) && this.status[sc] !== 'syncing' && Date.now() - (this.lastPullTimestamp[sc] || 0) > 20000) {
+          this.pullFromSheets({ silent: true }, sc);
+        }
       }
     }, 25000);
   },
 
-  getGasUrl() {
-    return localStorage.getItem(this.STORAGE_KEY_URL) || this.DEFAULT_GAS_URL || '';
+  // Deteksi Scope Aktif ('rt' vs 'masjid')
+  getActiveScope() {
+    if (this.currentScope) return this.currentScope;
+    if (window.AppState && window.AppState.currentRole === 'admin_masjid') {
+      return 'masjid';
+    }
+    return 'rt';
   },
 
-  setGasUrl(url) {
-    const cleanUrl = (url || '').trim();
-    if (cleanUrl) {
-      localStorage.setItem(this.STORAGE_KEY_URL, cleanUrl);
-    } else {
-      localStorage.removeItem(this.STORAGE_KEY_URL);
+  // Dapatkan URL Web App Apps Script berdasarkan Scope
+  getGasUrl(scope) {
+    const targetScope = scope || this.getActiveScope();
+    if (targetScope === 'masjid') {
+      return localStorage.getItem(this.STORAGE_KEY_URL_MASJID) || this.DEFAULT_GAS_URL_MASJID || '';
     }
+    return localStorage.getItem(this.STORAGE_KEY_URL_RT) || this.DEFAULT_GAS_URL_RT || '';
+  },
+
+  // Simpan URL Web App Apps Script ke LocalStorage berdasarkan Scope
+  setGasUrl(url, scope) {
+    const targetScope = scope || this.getActiveScope();
+    const cleanUrl = (url || '').trim();
+    const storageKey = targetScope === 'masjid' ? this.STORAGE_KEY_URL_MASJID : this.STORAGE_KEY_URL_RT;
+    if (cleanUrl) {
+      localStorage.setItem(storageKey, cleanUrl);
+      this.status[targetScope] = 'connected';
+    } else {
+      localStorage.removeItem(storageKey);
+      this.status[targetScope] = 'disconnected';
+    }
+    this.updateStatusUI();
+  },
+
+  getLastSyncTime(scope) {
+    const targetScope = scope || this.getActiveScope();
+    const storageKey = targetScope === 'masjid' ? this.STORAGE_KEY_LAST_SYNC_MASJID : this.STORAGE_KEY_LAST_SYNC_RT;
+    return localStorage.getItem(storageKey) || this.lastSyncTime[targetScope] || null;
+  },
+
+  setLastSyncTime(isoString, scope) {
+    const targetScope = scope || this.getActiveScope();
+    const storageKey = targetScope === 'masjid' ? this.STORAGE_KEY_LAST_SYNC_MASJID : this.STORAGE_KEY_LAST_SYNC_RT;
+    if (isoString) {
+      localStorage.setItem(storageKey, isoString);
+      this.lastSyncTime[targetScope] = isoString;
+    } else {
+      localStorage.removeItem(storageKey);
+      this.lastSyncTime[targetScope] = null;
+    }
+  },
+
+  // Buka Modal Sinkronisasi dengan Tab Scope yang Sesuai
+  openSyncModal(scope = null) {
+    const targetScope = scope || (window.AppState && window.AppState.currentRole === 'admin_masjid' ? 'masjid' : 'rt');
+    this.currentScope = targetScope;
+    this.switchScopeUI(targetScope);
+    if (window.App && typeof window.App.openModal === 'function') {
+      window.App.openModal('modalCloudSync');
+    }
+  },
+
+  // Beralih Tampilan Tab Scope di dalam Modal
+  switchScopeUI(scope) {
+    this.currentScope = scope;
+    const btnRt = document.getElementById('btnCloudScopeRt');
+    const btnMasjid = document.getElementById('btnCloudScopeMasjid');
+    const inputGasUrl = document.getElementById('inputGasUrl');
+    const scopeDesc = document.getElementById('modalCloudScopeDesc');
+    const guideName = document.getElementById('modalCloudGuideName');
+    const modalTitle = document.getElementById('modalCloudTitle');
+
+    if (btnRt && btnMasjid) {
+      if (scope === 'masjid') {
+        btnMasjid.classList.add('active');
+        btnMasjid.style.background = '#059669';
+        btnMasjid.style.color = '#ffffff';
+        btnMasjid.style.borderColor = '#059669';
+
+        btnRt.classList.remove('active');
+        btnRt.style.background = '#ffffff';
+        btnRt.style.color = '#64748b';
+        btnRt.style.borderColor = '#cbd5e1';
+      } else {
+        btnRt.classList.add('active');
+        btnRt.style.background = '#0f766e';
+        btnRt.style.color = '#ffffff';
+        btnRt.style.borderColor = '#0f766e';
+
+        btnMasjid.classList.remove('active');
+        btnMasjid.style.background = '#ffffff';
+        btnMasjid.style.color = '#64748b';
+        btnMasjid.style.borderColor = '#cbd5e1';
+      }
+    }
+
+    if (inputGasUrl) {
+      inputGasUrl.value = this.getGasUrl(scope);
+    }
+
+    if (scope === 'masjid') {
+      if (modalTitle) modalTitle.innerHTML = '<span>🕌 Cloud Database: Masjid Sabilillah</span>';
+      if (scopeDesc) {
+        scopeDesc.innerHTML = `
+          Hubungkan pembukuan <strong>Masjid Sabilillah</strong> ke spreadsheet terpisah. Data kas masuk, infaq Jumat, kotak ahad, pengeluaran takmir, dan inventaris aset tersimpan aman di Google Sheets khusus DKM tanpa membebani data warga RT.
+        `;
+      }
+      if (guideName) {
+        guideName.innerHTML = `
+          Salin isi kode dari file <code>google-apps-script/Code_Masjid.gs</code> ke Apps Script spreadsheet khusus masjid Anda.
+        `;
+      }
+    } else {
+      if (modalTitle) modalTitle.innerHTML = '<span>🏢 Cloud Database: Lingkungan RT</span>';
+      if (scopeDesc) {
+        scopeDesc.innerHTML = `
+          Hubungkan administrasi <strong>Lingkungan RT</strong> ke spreadsheet terpisah. Data kependudukan warga, matriks iuran 12 bulan, buku kas RT, akun petugas penagih blok, dan setoran kas tersimpan otomatis di Google Drive pengurus.
+        `;
+      }
+      if (guideName) {
+        guideName.innerHTML = `
+          Salin isi kode dari file <code>google-apps-script/Code_RT.gs</code> ke Apps Script spreadsheet khusus lingkungan RT Anda.
+        `;
+      }
+    }
+
     this.updateStatusUI();
   },
 
   // Update Status Pill in Header and Modal
   updateStatusUI() {
-    const gasUrl = this.getGasUrl();
+    const isMasjidRole = window.AppState && window.AppState.currentRole === 'admin_masjid';
+    const headerScope = isMasjidRole ? 'masjid' : 'rt';
+    const headerGasUrl = this.getGasUrl(headerScope);
+    const headerStatus = this.status[headerScope] || 'disconnected';
+
+    // 1. Header Pill Update
     const cloudPill = document.getElementById('cloudSyncPill');
     const cloudDot = document.getElementById('cloudSyncDot');
     const cloudText = document.getElementById('cloudSyncText');
+
+    if (cloudPill) {
+      if (!headerGasUrl) {
+        if (cloudDot) cloudDot.style.background = '#94a3b8';
+        if (cloudText) cloudText.textContent = isMasjidRole ? 'Kas Masjid: DB Lokal' : 'Mode: Database Lokal';
+        cloudPill.title = isMasjidRole
+          ? 'Database Masjid belum terhubung ke Google Sheets. Klik untuk mengonfigurasi.'
+          : 'Database RT belum terhubung ke Google Sheets. Klik untuk mengonfigurasi.';
+      } else if (headerStatus === 'syncing') {
+        if (cloudDot) cloudDot.style.background = '#f59e0b';
+        if (cloudText) cloudText.textContent = isMasjidRole ? 'Menyinkronkan Masjid...' : 'Menyinkronkan RT...';
+        cloudPill.title = 'Sedang menyinkronkan data dengan Google Sheets...';
+      } else if (headerStatus === 'connected') {
+        if (cloudDot) cloudDot.style.background = isMasjidRole ? '#059669' : '#10b981';
+        if (cloudText) cloudText.textContent = isMasjidRole ? 'Cloud Kas Masjid Aktif' : 'Google Sheet Terhubung';
+        cloudPill.title = isMasjidRole
+          ? 'Terhubung ke Google Sheets Masjid Sabilillah. Klik untuk detail / sync manual.'
+          : 'Terhubung ke Google Sheets Lingkungan RT. Klik untuk detail / sync manual.';
+      } else if (headerStatus === 'error') {
+        if (cloudDot) cloudDot.style.background = '#ef4444';
+        if (cloudText) cloudText.textContent = isMasjidRole ? 'Sync Masjid Gagal' : 'Sync RT Gagal';
+        cloudPill.title = 'Gagal berkomunikasi dengan Google Sheets. Periksa URL Anda.';
+      }
+    }
+
+    // 2. Modal Status Box Update (Sesuai tab scope yang sedang dilihat di modal)
+    const modalScope = this.getActiveScope();
+    const modalGasUrl = this.getGasUrl(modalScope);
+    const modalStatus = this.status[modalScope] || 'disconnected';
     const modalStatusBox = document.getElementById('modalCloudStatus');
     const lastSyncEl = document.getElementById('cloudLastSyncText');
+    const lastSyncVal = this.getLastSyncTime(modalScope);
 
-    if (!cloudPill) return;
-
-    if (!gasUrl) {
-      this.status = 'disconnected';
-      if (cloudDot) cloudDot.style.background = '#94a3b8';
-      if (cloudText) cloudText.textContent = 'Mode: Database Lokal';
-      cloudPill.title = 'Belum terhubung ke Google Sheets. Klik untuk mengonfigurasi.';
-      
-      if (modalStatusBox) {
+    if (modalStatusBox) {
+      const scopeBadgeName = modalScope === 'masjid' ? 'Masjid Sabilillah' : 'Lingkungan RT';
+      if (!modalGasUrl) {
         modalStatusBox.innerHTML = `
-          <div style="display: flex; align-items: center; gap: 10px; color: #64748b;">
-            <span style="width: 10px; height: 10px; border-radius: 50%; background: #94a3b8; display: inline-block;"></span>
-            <span>Database Lokal Aktif (Data tersimpan di browser ini)</span>
+          <div style="display: flex; align-items: center; justify-content: space-between; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 10px 14px;">
+            <div style="display: flex; align-items: center; gap: 10px; color: #64748b; font-size: 13px;">
+              <span style="width: 10px; height: 10px; border-radius: 50%; background: #94a3b8; display: inline-block;"></span>
+              <span>Database Lokal (${scopeBadgeName}) &mdash; Data tersimpan di memori browser ini.</span>
+            </div>
+            <span style="font-size: 11px; color: #94a3b8; font-weight: 600;">Offline / Lokal</span>
           </div>
         `;
-      }
-    } else if (this.status === 'syncing') {
-      if (cloudDot) cloudDot.style.background = '#f59e0b';
-      if (cloudText) cloudText.textContent = 'Menyinkronkan...';
-    } else if (this.status === 'connected') {
-      if (cloudDot) cloudDot.style.background = '#10b981';
-      if (cloudText) cloudText.textContent = 'Google Sheet Terhubung';
-      cloudPill.title = 'Terhubung ke Google Sheets. Klik untuk detail / sync manual.';
-      
-      if (modalStatusBox) {
+      } else if (modalStatus === 'syncing') {
         modalStatusBox.innerHTML = `
-          <div style="display: flex; align-items: center; justify-content: space-between; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 12px; padding: 12px 14px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 10px 14px;">
+            <div style="display: flex; align-items: center; gap: 10px; color: #92400e; font-weight: 600; font-size: 13px;">
+              <span style="width: 10px; height: 10px; border-radius: 50%; background: #f59e0b; display: inline-block; animation: pulse 1.5s infinite;"></span>
+              <span>Menyinkronkan data ${scopeBadgeName} dengan Google Sheets...</span>
+            </div>
+            <span style="font-size: 11px; color: #d97706; font-weight: 600;">Syncing</span>
+          </div>
+        `;
+      } else if (modalStatus === 'connected') {
+        modalStatusBox.innerHTML = `
+          <div style="display: flex; align-items: center; justify-content: space-between; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 12px; padding: 10px 14px;">
             <div style="display: flex; align-items: center; gap: 10px; color: #065f46; font-weight: 600; font-size: 13px;">
               <span style="width: 10px; height: 10px; border-radius: 50%; background: #10b981; display: inline-block;"></span>
-              <span>Terhubung ke Cloud Google Sheets</span>
+              <span>Cloud Google Sheets (${scopeBadgeName}) Terhubung & Aktif</span>
             </div>
-            <span style="font-size: 11px; color: #047857;">Aktif</span>
+            <span style="font-size: 11px; color: #047857; font-weight: 700; background: #d1fae5; padding: 2px 8px; border-radius: 999px;">Online</span>
+          </div>
+        `;
+      } else if (modalStatus === 'error') {
+        modalStatusBox.innerHTML = `
+          <div style="display: flex; align-items: center; justify-content: space-between; background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 10px 14px;">
+            <div style="display: flex; align-items: center; gap: 10px; color: #991b1b; font-weight: 600; font-size: 13px;">
+              <span style="width: 10px; height: 10px; border-radius: 50%; background: #ef4444; display: inline-block;"></span>
+              <span>Gagal Terhubung ke Cloud ${scopeBadgeName}</span>
+            </div>
+            <span style="font-size: 11px; color: #b91c1c; font-weight: 600;">Error</span>
           </div>
         `;
       }
-    } else if (this.status === 'error') {
-      if (cloudDot) cloudDot.style.background = '#ef4444';
-      if (cloudText) cloudText.textContent = 'Sync Gagal';
-      cloudPill.title = 'Gagal berkomunikasi dengan Google Sheets. Periksa URL Anda.';
     }
 
-    if (lastSyncEl && this.lastSyncTime) {
-      lastSyncEl.textContent = `Sinkronisasi terakhir: ${new Date(this.lastSyncTime).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
-    }
-  },
-
-  // Immediate push snapshot to Google Sheets
-  async syncNow() {
-    const gasUrl = this.getGasUrl();
-    if (!gasUrl) return;
-    if (this.debounceTimer) clearTimeout(this.debounceTimer);
-    try {
-      const localData = DB.load();
-      await fetch(gasUrl, {
-        method: 'POST',
-        mode: 'cors',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'syncAll', data: localData })
-      });
-      this.status = 'connected';
-      this.lastSyncTime = new Date().toISOString();
-      localStorage.setItem(this.STORAGE_KEY_LAST_SYNC, this.lastSyncTime);
-      this.updateStatusUI();
-    } catch (err) {
-      console.warn("Background immediate sync error:", err);
+    if (lastSyncEl) {
+      if (lastSyncVal) {
+        lastSyncEl.textContent = `Sinkron terakhir: ${new Date(lastSyncVal).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
+      } else {
+        lastSyncEl.textContent = 'Belum pernah disinkronkan';
+      }
     }
   },
 
-  // Debounced background auto-sync when changes occur
-  autoSyncBackground() {
-    const gasUrl = this.getGasUrl();
-    if (!gasUrl) return;
-
-    // PENGAMAN: Jangan auto-sync jika pengunjung baru belum pernah berhasil menarik data dari Cloud
-    // Ini mencegah browser baru tanpa cache menimpa data Cloud dengan data demo default.
-    if (!this.hasPulledOnce && !localStorage.getItem(this.STORAGE_KEY_LAST_SYNC)) {
-      console.log("[CloudSync] Auto-sync ditangguhkan sampai pull awal dari cloud selesai.");
-      return;
-    }
-
-    if (this.debounceTimer) clearTimeout(this.debounceTimer);
-    this.debounceTimer = setTimeout(async () => {
-      await this.syncNow();
-    }, 1200);
-  },
-
-  // Test Connection
-  async testConnection(url) {
-    const targetUrl = (url || this.getGasUrl()).trim();
+  // Test Connection untuk Scope Tertentu
+  async testConnection(url, scope = null) {
+    const targetScope = scope || this.getActiveScope();
+    const targetUrl = (url || this.getGasUrl(targetScope)).trim();
     if (!targetUrl) {
       alert("Masukkan URL Web App Google Apps Script terlebih dahulu!");
       return false;
     }
 
-    this.status = 'syncing';
+    this.status[targetScope] = 'syncing';
     this.updateStatusUI();
 
     try {
@@ -172,29 +330,32 @@ const CloudSync = {
       const data = await res.json();
 
       if (data && data.status === 'success') {
-        this.status = 'connected';
-        this.setGasUrl(targetUrl);
+        this.status[targetScope] = 'connected';
+        this.setGasUrl(targetUrl, targetScope);
         this.updateStatusUI();
-        alert("✅ Koneksi Berhasil! Google Apps Script siap digunakan sebagai database RukunKu.");
+        const scopeLabel = targetScope === 'masjid' ? 'Masjid Sabilillah' : 'Lingkungan RT';
+        alert(`✅ Koneksi Berhasil!\n\nGoogle Apps Script untuk ${scopeLabel} aktif dan siap digunakan sebagai database online.`);
         return true;
       } else {
-        throw new Error(data.message || 'Respons tidak valid');
+        throw new Error(data.message || 'Respons tidak valid dari server');
       }
     } catch (err) {
-      this.status = 'error';
+      this.status[targetScope] = 'error';
       this.updateStatusUI();
-      alert("❌ Gagal terhubung ke Google Apps Script.\n\nPastikan:\n1. URL berakhiran /exec\n2. Saat Deploy, akses diatur ke 'Anyone'\n\nPesan error: " + err.message);
+      const scopeLabel = targetScope === 'masjid' ? 'Masjid' : 'RT';
+      alert(`❌ Gagal terhubung ke Google Apps Script (${scopeLabel}).\n\nPastikan:\n1. URL berakhiran /exec\n2. Saat Deploy, akses diatur ke 'Anyone'\n\nPesan error: ` + err.message);
       return false;
     }
   },
 
-  // Pull Data from Google Sheets (GET action=getData)
-  async pullFromSheets(options = {}) {
-    const gasUrl = this.getGasUrl();
-    if (!gasUrl) return;
+  // Pull Data from Google Sheets (GET action=getData) sesuai Scope
+  async pullFromSheets(options = {}, scope = null) {
+    const targetScope = scope || this.getActiveScope();
+    const gasUrl = this.getGasUrl(targetScope);
+    if (!gasUrl) return false;
 
-    this.lastPullTimestamp = Date.now();
-    this.status = 'syncing';
+    this.lastPullTimestamp[targetScope] = Date.now();
+    this.status[targetScope] = 'syncing';
     this.updateStatusUI();
 
     try {
@@ -206,13 +367,45 @@ const CloudSync = {
         const cloudData = json.data;
         const currentLocal = DB.load();
 
-        // Cek apakah di Google Sheets sudah ada data warga nyata
+        if (targetScope === 'masjid') {
+          // =================================================================
+          // MERGE KHUSUS MASJID: Tidak menyentuh data kependudukan RT sama sekali
+          // =================================================================
+          const merged = {
+            ...currentLocal,
+            masjidSettings: cloudData.masjidSettings || currentLocal.masjidSettings,
+            masjidAdmin: cloudData.masjidAdmin || currentLocal.masjidAdmin,
+            masjidTransactions: Array.isArray(cloudData.masjidTransactions) ? cloudData.masjidTransactions : (currentLocal.masjidTransactions || []),
+            masjidAssets: Array.isArray(cloudData.masjidAssets) ? cloudData.masjidAssets : (currentLocal.masjidAssets || [])
+          };
+
+          DB.save(merged, { skipSync: true });
+          this.hasPulledOnce.masjid = true;
+          this.status.masjid = 'connected';
+          this.setLastSyncTime(new Date().toISOString(), 'masjid');
+
+          if (window.App) {
+            window.App.data = merged;
+            if (typeof window.App.renderMasjidDashboard === 'function') window.App.renderMasjidDashboard();
+            if (typeof window.App.renderMasjidKas === 'function') window.App.renderMasjidKas();
+            if (typeof window.App.renderMasjidAset === 'function') window.App.renderMasjidAset();
+            if (typeof window.App.renderMasjidLaporan === 'function') window.App.renderMasjidLaporan();
+          }
+
+          this.updateStatusUI();
+          if (!options.silent) {
+            alert("✅ Data kas & inventaris aset Masjid Sabilillah berhasil ditarik dan diperbarui dari Google Sheets!");
+          }
+          return true;
+        }
+
+        // ===================================================================
+        // MERGE KHUSUS LINGKUNGAN RT:
+        // ===================================================================
         const hasCloudResidents = Array.isArray(cloudData.residents) && cloudData.residents.length > 0;
         const residentsToUse = hasCloudResidents
           ? cloudData.residents.map(cr => {
               const localMatch = (currentLocal.residents || []).find(lr => lr.id === cr.id);
-              
-              // Gabungkan familyMembers agar fotoKtp lokal tidak terhapus jika cloud mengembalikan string kosong
               const mergedFamily = (cr.familyMembers || []).map((cfm, idx) => {
                 const lfm = (localMatch && localMatch.familyMembers)
                   ? (localMatch.familyMembers.find(m => m.id === cfm.id) || localMatch.familyMembers[idx])
@@ -223,13 +416,11 @@ const CloudSync = {
                 };
               });
 
-              // Pertahankan daftar anggota keluarga lokal jika lokal memiliki data lebih lengkap/baru
               let finalFamily = mergedFamily.length > 0 ? mergedFamily : (cr.familyMembers || []);
               if (localMatch && Array.isArray(localMatch.familyMembers) && localMatch.familyMembers.length > finalFamily.length) {
                 finalFamily = localMatch.familyMembers;
               }
 
-              // Pastikan jumlahAnggota tidak turun kembali menjadi 1 jika di lokal atau cloud ada angka lebih besar
               const safeJumlah = Math.max(
                 Number(cr.jumlahAnggota) || 1,
                 Number(localMatch ? localMatch.jumlahAnggota : 1) || 1,
@@ -246,7 +437,6 @@ const CloudSync = {
             })
           : (currentLocal.residents || []);
 
-        // Pastikan categories memiliki format array yang aman
         let cleanCategories = currentLocal.categories;
         if (cloudData.categories && typeof cloudData.categories === 'object') {
           cleanCategories = {
@@ -255,7 +445,6 @@ const CloudSync = {
           };
         }
 
-        // Pastikan phone bertipe string dan assignedBlocks bertipe array
         const cleanCollectors = Array.isArray(cloudData.collectors)
           ? cloudData.collectors.map(c => ({
               ...c,
@@ -274,16 +463,21 @@ const CloudSync = {
           duesMatrix: cloudData.duesMatrix || currentLocal.duesMatrix,
           talangan: Array.isArray(cloudData.talangan) ? cloudData.talangan : (currentLocal.talangan || []),
           collectors: cleanCollectors,
-          setoranBlok: Array.isArray(cloudData.setoranBlok) ? cloudData.setoranBlok : (currentLocal.setoranBlok || [])
+          setoranBlok: Array.isArray(cloudData.setoranBlok) ? cloudData.setoranBlok : (currentLocal.setoranBlok || []),
+          // Data masjid selalu dipastikan terjaga utuh dari currentLocal (tidak tertimpa oleh sync RT)
+          masjidSettings: currentLocal.masjidSettings || {},
+          masjidAdmin: currentLocal.masjidAdmin || {},
+          masjidTransactions: Array.isArray(currentLocal.masjidTransactions) ? currentLocal.masjidTransactions : [],
+          masjidAssets: Array.isArray(currentLocal.masjidAssets) ? currentLocal.masjidAssets : []
         };
 
-        // Simpan ke local tanpa trigger auto-sync balik ke server
         DB.save(merged, { skipSync: true });
-        this.hasPulledOnce = true;
+        this.hasPulledOnce.rt = true;
+        this.status.rt = 'connected';
+        this.setLastSyncTime(new Date().toISOString(), 'rt');
 
         if (window.App) {
           window.App.data = merged;
-          // Hanya re-render view utama jika user sudah login
           if (window.AppState && window.AppState.currentUser) {
             try {
               if (typeof window.App.updateSettingsUI === 'function') window.App.updateSettingsUI();
@@ -302,7 +496,6 @@ const CloudSync = {
               console.warn("[CloudSync] Background render error:", renderErr);
             }
           } else {
-            // Jika user masih di halaman login / register, cukup update opsi blok registrasi & judul lingkungan
             try {
               if (typeof window.App.updateSettingsUI === 'function') window.App.updateSettingsUI();
               if (typeof window.App.renderBlockOptions === 'function') window.App.renderBlockOptions();
@@ -310,40 +503,85 @@ const CloudSync = {
           }
         }
 
-        this.status = 'connected';
-        this.lastSyncTime = new Date().toISOString();
-        localStorage.setItem(this.STORAGE_KEY_LAST_SYNC, this.lastSyncTime);
         this.updateStatusUI();
-
         if (!options.silent) {
-          alert("✅ Data berhasil ditarik dan diperbarui dari Google Sheets!");
+          alert("✅ Data warga & kas RT berhasil ditarik dan diperbarui dari Google Sheets!");
         }
+        return true;
       } else {
         throw new Error(json.message || 'Gagal memuat data dari cloud');
       }
     } catch (err) {
-      console.warn("Gagal sinkronisasi dari Google Sheets:", err);
-      this.status = 'error';
+      console.warn(`Gagal sinkronisasi dari Google Sheets (${targetScope}):`, err);
+      this.status[targetScope] = 'error';
       this.updateStatusUI();
       if (!options.silent) {
-        alert("⚠️ Gagal menarik data dari Google Sheets. Aplikasi tetap menggunakan data lokal.");
+        const scopeLabel = targetScope === 'masjid' ? 'Masjid' : 'RT';
+        alert(`⚠️ Gagal menarik data dari Google Sheets (${scopeLabel}). Aplikasi tetap menggunakan data lokal.`);
       }
+      return false;
     }
   },
 
-  // Push Local Data Snapshot to Google Sheets (POST action=syncAll)
-  async pushToSheets() {
-    const gasUrl = this.getGasUrl();
+  // Push Snapshot Data ke Google Sheets (POST action=syncAll) sesuai Scope
+  async pushToSheets(scope = null) {
+    const targetScope = scope || this.getActiveScope();
+    const gasUrl = this.getGasUrl(targetScope);
     if (!gasUrl) {
       alert("Harap masukkan URL Web App Google Apps Script terlebih dahulu!");
       return;
     }
 
-    if (!confirm("Kirim seluruh data lokal (warga, transaksi, iuran, talangan, petugas, setoran) ke Google Sheets? Data di Spreadsheet akan disinkronkan.")) {
+    if (targetScope === 'masjid') {
+      if (!confirm("Kirim seluruh data kas & inventaris aset Masjid Sabilillah ke Google Sheets Masjid? Data di sheet Masjid_Kas, Masjid_Aset, dan Pengaturan_Masjid akan disinkronkan.")) {
+        return;
+      }
+
+      this.status.masjid = 'syncing';
+      this.updateStatusUI();
+
+      const localData = DB.load();
+      const payload = {
+        action: 'syncAll',
+        data: {
+          masjidSettings: localData.masjidSettings || {},
+          masjidAdmin: localData.masjidAdmin || {},
+          masjidTransactions: localData.masjidTransactions || [],
+          masjidAssets: localData.masjidAssets || []
+        }
+      };
+
+      try {
+        const res = await fetch(gasUrl, {
+          method: 'POST',
+          mode: 'cors',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(payload)
+        });
+
+        const json = await res.json();
+        if (json && json.status === 'success') {
+          this.status.masjid = 'connected';
+          this.setLastSyncTime(new Date().toISOString(), 'masjid');
+          this.updateStatusUI();
+          alert("🎉 Berhasil! Seluruh data kas dan inventaris Masjid Sabilillah telah tersimpan di Google Sheets Masjid Anda.");
+        } else {
+          throw new Error(json.message || 'Gagal menyimpan ke Google Sheets Masjid');
+        }
+      } catch (err) {
+        this.status.masjid = 'error';
+        this.updateStatusUI();
+        alert("❌ Terjadi kesalahan saat mengirim data ke Google Sheets Masjid: " + err.message);
+      }
       return;
     }
 
-    this.status = 'syncing';
+    // Push Scope RT:
+    if (!confirm("Kirim seluruh data lingkungan RT (warga, transaksi, iuran, talangan, petugas, setoran) ke Google Sheets RT? Data di Spreadsheet RT akan disinkronkan.")) {
+      return;
+    }
+
+    this.status.rt = 'syncing';
     this.updateStatusUI();
 
     const localData = DB.load();
@@ -352,48 +590,121 @@ const CloudSync = {
         if (!r.password) r.password = '123456';
       });
     }
+
     const payload = {
       action: 'syncAll',
-      data: localData
+      data: {
+        settings: localData.settings,
+        blocks: localData.blocks,
+        categories: localData.categories,
+        residents: localData.residents,
+        transactions: localData.transactions,
+        duesMatrix: localData.duesMatrix,
+        talangan: localData.talangan,
+        collectors: localData.collectors,
+        setoranBlok: localData.setoranBlok
+      }
     };
 
     try {
       const res = await fetch(gasUrl, {
         method: 'POST',
         mode: 'cors',
-        headers: {
-          'Content-Type': 'text/plain;charset=utf-8'
-        },
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify(payload)
       });
 
       const json = await res.json();
       if (json && json.status === 'success') {
-        this.status = 'connected';
-        this.lastSyncTime = new Date().toISOString();
-        localStorage.setItem(this.STORAGE_KEY_LAST_SYNC, this.lastSyncTime);
+        this.status.rt = 'connected';
+        this.setLastSyncTime(new Date().toISOString(), 'rt');
         this.updateStatusUI();
-        alert("🎉 Berhasil! Seluruh data warga, kas, dan iuran telah tersimpan di Google Sheets Anda.");
+        alert("🎉 Berhasil! Seluruh data warga, kas, dan iuran RT telah tersimpan di Google Sheets RT Anda.");
       } else {
-        throw new Error(json.message || 'Gagal menyimpan ke Google Sheets');
+        throw new Error(json.message || 'Gagal menyimpan ke Google Sheets RT');
       }
     } catch (err) {
-      this.status = 'error';
+      this.status.rt = 'error';
       this.updateStatusUI();
-      alert("❌ Terjadi kesalahan saat mengirim data ke Google Sheets: " + err.message);
+      alert("❌ Terjadi kesalahan saat mengirim data ke Google Sheets RT: " + err.message);
     }
   },
 
+  // Immediate push snapshot ke Google Sheets sesuai scope aktif
+  async syncNow(scope = null) {
+    const targetScope = scope || this.getActiveScope();
+    const gasUrl = this.getGasUrl(targetScope);
+    if (!gasUrl) return;
+    if (this.debounceTimer) clearTimeout(this.debounceTimer);
+
+    try {
+      const localData = DB.load();
+      let payloadData;
+
+      if (targetScope === 'masjid') {
+        payloadData = {
+          masjidSettings: localData.masjidSettings || {},
+          masjidAdmin: localData.masjidAdmin || {},
+          masjidTransactions: localData.masjidTransactions || [],
+          masjidAssets: localData.masjidAssets || []
+        };
+      } else {
+        payloadData = {
+          settings: localData.settings,
+          blocks: localData.blocks,
+          categories: localData.categories,
+          residents: localData.residents,
+          transactions: localData.transactions,
+          duesMatrix: localData.duesMatrix,
+          talangan: localData.talangan,
+          collectors: localData.collectors,
+          setoranBlok: localData.setoranBlok
+        };
+      }
+
+      await fetch(gasUrl, {
+        method: 'POST',
+        mode: 'cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'syncAll', data: payloadData })
+      });
+      this.status[targetScope] = 'connected';
+      this.setLastSyncTime(new Date().toISOString(), targetScope);
+      this.updateStatusUI();
+    } catch (err) {
+      console.warn(`Background immediate sync error (${targetScope}):`, err);
+    }
+  },
+
+  // Debounced auto-sync saat data lokal berubah
+  autoSyncBackground() {
+    const targetScope = this.getActiveScope();
+    const gasUrl = this.getGasUrl(targetScope);
+    if (!gasUrl) return;
+
+    // PENGAMAN: Jangan auto-sync jika pengunjung baru belum pernah menarik data dari Cloud
+    const lastSync = this.getLastSyncTime(targetScope);
+    if (!this.hasPulledOnce[targetScope] && !lastSync) {
+      console.log(`[CloudSync] Auto-sync (${targetScope}) ditangguhkan sampai pull awal selesai.`);
+      return;
+    }
+
+    if (this.debounceTimer) clearTimeout(this.debounceTimer);
+    this.debounceTimer = setTimeout(async () => {
+      await this.syncNow(targetScope);
+    }, 1200);
+  },
+
   // =========================================================================
-  // SINGLE-ENTITY DIRECT SYNC METHODS (Aman dari Konflik Antar Perangkat)
+  // SINGLE-ENTITY DIRECT SYNC METHODS: LINGKUNGAN RT
   // =========================================================================
 
-  // Tambah / Update data warga langsung ke Google Sheets (sheet Warga)
+  // Tambah / Update data warga langsung ke Google Sheets RT (sheet Warga)
   async saveResidentDirect(resident) {
-    const gasUrl = this.getGasUrl();
+    const gasUrl = this.getGasUrl('rt');
     if (!gasUrl || !resident) return false;
     try {
-      this.status = 'syncing';
+      this.status.rt = 'syncing';
       this.updateStatusUI();
       const res = await fetch(gasUrl, {
         method: 'POST',
@@ -403,7 +714,6 @@ const CloudSync = {
       });
       const json = await res.json();
       if (json && json.status === 'success') {
-        // Jika server mengembalikan resident dengan URL Google Drive, update data lokal segera
         if (json.resident) {
           const currentLocal = DB.load();
           const rIdx = (currentLocal.residents || []).findIndex(r => r.id === json.resident.id);
@@ -426,9 +736,8 @@ const CloudSync = {
             }
           }
         }
-        this.status = 'connected';
-        this.lastSyncTime = new Date().toISOString();
-        localStorage.setItem(this.STORAGE_KEY_LAST_SYNC, this.lastSyncTime);
+        this.status.rt = 'connected';
+        this.setLastSyncTime(new Date().toISOString(), 'rt');
         this.updateStatusUI();
         return true;
       }
@@ -438,12 +747,12 @@ const CloudSync = {
     return false;
   },
 
-  // Hapus data warga langsung di Google Sheets
+  // Hapus data warga langsung di Google Sheets RT
   async deleteResidentDirect(residentId) {
-    const gasUrl = this.getGasUrl();
+    const gasUrl = this.getGasUrl('rt');
     if (!gasUrl || !residentId) return false;
     try {
-      this.status = 'syncing';
+      this.status.rt = 'syncing';
       this.updateStatusUI();
       const res = await fetch(gasUrl, {
         method: 'POST',
@@ -453,9 +762,8 @@ const CloudSync = {
       });
       const json = await res.json();
       if (json && json.status === 'success') {
-        this.status = 'connected';
-        this.lastSyncTime = new Date().toISOString();
-        localStorage.setItem(this.STORAGE_KEY_LAST_SYNC, this.lastSyncTime);
+        this.status.rt = 'connected';
+        this.setLastSyncTime(new Date().toISOString(), 'rt');
         this.updateStatusUI();
         return true;
       }
@@ -465,12 +773,12 @@ const CloudSync = {
     return false;
   },
 
-  // Tambah / Update data petugas penagih langsung ke Google Sheets (sheet Petugas)
+  // Tambah / Update data petugas penagih langsung ke Google Sheets RT (sheet Petugas)
   async saveCollectorDirect(collector) {
-    const gasUrl = this.getGasUrl();
+    const gasUrl = this.getGasUrl('rt');
     if (!gasUrl || !collector) return false;
     try {
-      this.status = 'syncing';
+      this.status.rt = 'syncing';
       this.updateStatusUI();
       const res = await fetch(gasUrl, {
         method: 'POST',
@@ -480,9 +788,8 @@ const CloudSync = {
       });
       const json = await res.json();
       if (json && json.status === 'success') {
-        this.status = 'connected';
-        this.lastSyncTime = new Date().toISOString();
-        localStorage.setItem(this.STORAGE_KEY_LAST_SYNC, this.lastSyncTime);
+        this.status.rt = 'connected';
+        this.setLastSyncTime(new Date().toISOString(), 'rt');
         this.updateStatusUI();
         return true;
       }
@@ -492,12 +799,12 @@ const CloudSync = {
     return false;
   },
 
-  // Hapus data petugas penagih langsung di Google Sheets
+  // Hapus data petugas penagih langsung di Google Sheets RT
   async deleteCollectorDirect(collectorId) {
-    const gasUrl = this.getGasUrl();
+    const gasUrl = this.getGasUrl('rt');
     if (!gasUrl || !collectorId) return false;
     try {
-      this.status = 'syncing';
+      this.status.rt = 'syncing';
       this.updateStatusUI();
       const res = await fetch(gasUrl, {
         method: 'POST',
@@ -507,9 +814,8 @@ const CloudSync = {
       });
       const json = await res.json();
       if (json && json.status === 'success') {
-        this.status = 'connected';
-        this.lastSyncTime = new Date().toISOString();
-        localStorage.setItem(this.STORAGE_KEY_LAST_SYNC, this.lastSyncTime);
+        this.status.rt = 'connected';
+        this.setLastSyncTime(new Date().toISOString(), 'rt');
         this.updateStatusUI();
         return true;
       }
@@ -519,12 +825,12 @@ const CloudSync = {
     return false;
   },
 
-  // Tambah / Update setoran kas blok langsung ke Google Sheets (sheet Setoran)
+  // Tambah / Update setoran kas blok langsung ke Google Sheets RT (sheet Setoran)
   async saveSetoranDirect(setoran) {
-    const gasUrl = this.getGasUrl();
+    const gasUrl = this.getGasUrl('rt');
     if (!gasUrl || !setoran) return false;
     try {
-      this.status = 'syncing';
+      this.status.rt = 'syncing';
       this.updateStatusUI();
       const res = await fetch(gasUrl, {
         method: 'POST',
@@ -534,9 +840,8 @@ const CloudSync = {
       });
       const json = await res.json();
       if (json && json.status === 'success') {
-        this.status = 'connected';
-        this.lastSyncTime = new Date().toISOString();
-        localStorage.setItem(this.STORAGE_KEY_LAST_SYNC, this.lastSyncTime);
+        this.status.rt = 'connected';
+        this.setLastSyncTime(new Date().toISOString(), 'rt');
         this.updateStatusUI();
         return true;
       }
@@ -548,10 +853,10 @@ const CloudSync = {
 
   // Upload file bebas atau foto bukti transfer langsung ke Google Drive
   async uploadFileToDrive(base64Data, fileName, folderName = 'Bukti Transfer Iuran') {
-    const gasUrl = this.getGasUrl();
+    const gasUrl = this.getGasUrl('rt');
     if (!gasUrl || !base64Data) return null;
     try {
-      this.status = 'syncing';
+      this.status.rt = 'syncing';
       this.updateStatusUI();
       const res = await fetch(gasUrl, {
         method: 'POST',
@@ -565,25 +870,25 @@ const CloudSync = {
         })
       });
       const json = await res.json();
-      this.status = 'connected';
+      this.status.rt = 'connected';
       this.updateStatusUI();
       if (json && json.status === 'success' && json.url) {
         return json.url;
       }
     } catch (err) {
       console.warn("Direct upload to Google Drive failed:", err);
-      this.status = 'error';
+      this.status.rt = 'error';
       this.updateStatusUI();
     }
     return null;
   },
 
-  // Tambah / Update transaksi kas masuk / keluar langsung ke Google Sheets & Google Drive
+  // Tambah transaksi kas masuk / keluar RT langsung ke Google Sheets RT
   async saveTransactionDirect(transaction) {
-    const gasUrl = this.getGasUrl();
+    const gasUrl = this.getGasUrl('rt');
     if (!gasUrl || !transaction) return false;
     try {
-      this.status = 'syncing';
+      this.status.rt = 'syncing';
       this.updateStatusUI();
       const res = await fetch(gasUrl, {
         method: 'POST',
@@ -592,25 +897,24 @@ const CloudSync = {
         body: JSON.stringify({ action: 'addTransaction', transaction })
       });
       const json = await res.json();
-      this.status = 'connected';
-      this.lastSyncTime = new Date().toISOString();
-      localStorage.setItem(this.STORAGE_KEY_LAST_SYNC, this.lastSyncTime);
+      this.status.rt = 'connected';
+      this.setLastSyncTime(new Date().toISOString(), 'rt');
       this.updateStatusUI();
       if (json && json.status === 'success') {
         return json.transaction || true;
       }
       return true;
     } catch (err) {
-      console.warn("Direct save transaction failed:", err);
-      this.status = 'error';
+      console.warn("Direct save transaction RT failed:", err);
+      this.status.rt = 'error';
       this.updateStatusUI();
       return false;
     }
   },
 
-  // Update status checklist iuran warga per bulan langsung ke Google Sheets (sheet Iuran)
+  // Update status checklist iuran warga per bulan langsung ke Google Sheets RT (sheet Iuran)
   async updateDuesDirect(residentId, month, status) {
-    const gasUrl = this.getGasUrl();
+    const gasUrl = this.getGasUrl('rt');
     if (!gasUrl || !residentId) return false;
     try {
       await fetch(gasUrl, {
@@ -621,7 +925,133 @@ const CloudSync = {
       });
       return true;
     } catch (err) {
-      console.warn("Direct update dues failed:", err);
+      console.warn("Direct update dues RT failed:", err);
+      return false;
+    }
+  },
+
+  // =========================================================================
+  // SINGLE-ENTITY DIRECT SYNC METHODS: MASJID SABILILLAH
+  // =========================================================================
+
+  // Tambah transaksi kas masuk / keluar langsung ke Google Sheets Masjid
+  async saveMasjidTransactionDirect(transaction) {
+    const gasUrl = this.getGasUrl('masjid');
+    if (!gasUrl || !transaction) return false;
+    try {
+      this.status.masjid = 'syncing';
+      this.updateStatusUI();
+      const res = await fetch(gasUrl, {
+        method: 'POST',
+        mode: 'cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'addTransaction', transaction })
+      });
+      const json = await res.json();
+      this.status.masjid = 'connected';
+      this.setLastSyncTime(new Date().toISOString(), 'masjid');
+      this.updateStatusUI();
+      return json && json.status === 'success';
+    } catch (err) {
+      console.warn("Direct save masjid transaction failed:", err);
+      this.status.masjid = 'error';
+      this.updateStatusUI();
+      return false;
+    }
+  },
+
+  // Hapus transaksi kas masjid langsung di Google Sheets Masjid
+  async deleteMasjidTransactionDirect(id) {
+    const gasUrl = this.getGasUrl('masjid') || this.getGasUrl('rt');
+    if (!gasUrl || !id) return false;
+    try {
+      this.status.masjid = 'syncing';
+      this.updateStatusUI();
+      const res = await fetch(gasUrl, {
+        method: 'POST',
+        mode: 'cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'deleteMasjidTransaction', id })
+      });
+      const json = await res.json();
+      this.status.masjid = 'connected';
+      this.setLastSyncTime(new Date().toISOString(), 'masjid');
+      this.updateStatusUI();
+      return json && json.status === 'success';
+    } catch (err) {
+      console.warn("Direct delete masjid transaction failed:", err);
+      return false;
+    }
+  },
+
+  // Tambah / Edit aset inventaris masjid langsung ke Google Sheets Masjid
+  async saveMasjidAssetDirect(asset) {
+    const gasUrl = this.getGasUrl('masjid') || this.getGasUrl('rt');
+    if (!gasUrl || !asset) return false;
+    try {
+      this.status.masjid = 'syncing';
+      this.updateStatusUI();
+      const res = await fetch(gasUrl, {
+        method: 'POST',
+        mode: 'cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'saveMasjidAsset', asset })
+      });
+      const json = await res.json();
+      this.status.masjid = 'connected';
+      this.setLastSyncTime(new Date().toISOString(), 'masjid');
+      this.updateStatusUI();
+      return json && json.status === 'success';
+    } catch (err) {
+      console.warn("Direct save masjid asset failed:", err);
+      return false;
+    }
+  },
+
+  // Hapus aset inventaris masjid langsung di Google Sheets Masjid
+  async deleteMasjidAssetDirect(id) {
+    const gasUrl = this.getGasUrl('masjid') || this.getGasUrl('rt');
+    if (!gasUrl || !id) return false;
+    try {
+      this.status.masjid = 'syncing';
+      this.updateStatusUI();
+      const res = await fetch(gasUrl, {
+        method: 'POST',
+        mode: 'cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'deleteMasjidAsset', id })
+      });
+      const json = await res.json();
+      this.status.masjid = 'connected';
+      this.setLastSyncTime(new Date().toISOString(), 'masjid');
+      this.updateStatusUI();
+      return json && json.status === 'success';
+    } catch (err) {
+      console.warn("Direct delete masjid asset failed:", err);
+      return false;
+    }
+  },
+
+  // Kosongkan seluruh data kas & aset masjid di Google Sheets Masjid (Mulai dari Nol)
+  async resetMasjidDataDirect() {
+    const gasUrl = this.getGasUrl('masjid') || this.getGasUrl('rt');
+    if (!gasUrl) return false;
+    try {
+      this.status.masjid = 'syncing';
+      this.updateStatusUI();
+      const res = await fetch(gasUrl, {
+        method: 'POST',
+        mode: 'cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'resetMasjidData' })
+      });
+      const json = await res.json();
+      this.status.masjid = 'connected';
+      this.setLastSyncTime(new Date().toISOString(), 'masjid');
+      this.updateStatusUI();
+      return json && json.status === 'success';
+    } catch (err) {
+      console.warn("Direct reset masjid data failed:", err);
       return false;
     }
   }
@@ -629,7 +1059,7 @@ const CloudSync = {
 
 window.CloudSync = CloudSync;
 
-// Bootstrap bulletproof DOM ready
+// Inisialisasi saat DOM siap
 if (document.readyState !== 'loading') {
   CloudSync.init();
 } else {
