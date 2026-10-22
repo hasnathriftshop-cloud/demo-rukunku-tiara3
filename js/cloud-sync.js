@@ -10,7 +10,7 @@
 const CloudSync = {
   // URL Web App Google Apps Script default lingkungan RT 05 / RW 02 Perum Tiara Candi 3
   DEFAULT_GAS_URL_RT: 'https://script.google.com/macros/s/AKfycbxN-hWB9wZLcKLuUEA2dXX2D23DPrTHPYYkJwmmViq2EdFbwvg0KYEXvAUQFL1FU6JW6w/exec',
-  DEFAULT_GAS_URL_MASJID: '', // Dikosongkan default, diisi pengurus saat deploy Code_Masjid.gs
+  DEFAULT_GAS_URL_MASJID: 'https://script.google.com/macros/s/AKfycbw1GcSR545yTDc-tM71kukD3sa0_hMmbJ87kQ_wnSg9K7irKLffC6NOZKx4Beu33n3G/exec', // Dikosongkan default, diisi pengurus saat deploy Code_Masjid.gs
 
   // Storage Keys Terpisah
   STORAGE_KEY_URL_RT: 'rukunku_gas_url',
@@ -56,6 +56,10 @@ const CloudSync = {
     const activeScope = this.getActiveScope();
     if (this.getGasUrl(activeScope)) {
       this.pullFromSheets({ silent: true }, activeScope);
+    }
+    // Jika scope bukan masjid (misal warga) dan database masjid terkonfigurasi, tarik juga data kas masjid untuk transparansi warga
+    if (activeScope !== 'masjid' && this.getGasUrl('masjid')) {
+      this.pullFromSheets({ silent: true }, 'masjid');
     }
 
     // Auto-refresh data saat user kembali membuka tab browser RukunKu
@@ -390,6 +394,7 @@ const CloudSync = {
             if (typeof window.App.renderMasjidKas === 'function') window.App.renderMasjidKas();
             if (typeof window.App.renderMasjidAset === 'function') window.App.renderMasjidAset();
             if (typeof window.App.renderMasjidLaporan === 'function') window.App.renderMasjidLaporan();
+            if (typeof window.App.renderWargaMasjidTransparansi === 'function') window.App.renderWargaMasjidTransparansi();
           }
 
           this.updateStatusUI();
