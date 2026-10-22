@@ -2066,6 +2066,10 @@ const App = {
         wargaPersonalBox.innerHTML = '';
       }
     }
+
+    if (AppState.currentRole === 'warga') {
+      this.renderWargaMasjidTransparansi();
+    }
   },
 
   createTransactionRow(tx) {
@@ -6194,6 +6198,186 @@ const App = {
             <button type="button" class="btn-outline-pill" style="font-size: 10.5px; padding: 3px 8px; color: #be123c; border-color: #fecdd3;" onclick="App.deleteMasjidTransaction('${t.id}')" title="Hapus Transaksi">
               🗑️
             </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  },
+
+  renderWargaMasjidTransparansi() {
+    const s = this.data.masjidSettings || {};
+    const txs = this.data.masjidTransactions || [];
+    const periodeSelect = document.getElementById('wargaMasjidPeriodeSelect')?.value || 'bulan_ini';
+    const tipeFilter = document.getElementById('wargaMasjidFilterTipe')?.value || 'all';
+    const searchQuery = (document.getElementById('wargaMasjidSearch')?.value || '').toLowerCase().trim();
+
+    // 1. Rekening Infaq Resmi
+    const elRek = document.getElementById('wargaMasjidRekeningText');
+    if (elRek) {
+      const rawRek = s.noRekening || s.nomorRekening || '7207571808 BSI a.n Masjid Sabilillah';
+      const cleanRek = rawRek.replace(/^rekening\s*(infaq\s*)?(resmi)?\s*[:\-]?\s*/i, '').trim();
+      elRek.textContent = cleanRek;
+    }
+
+    const today = new Date();
+    const curYear = today.getFullYear();
+    const curMonth = today.getMonth() + 1;
+    const currentMonthStr = `${curYear}-${String(curMonth).padStart(2, '0')}`;
+    const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+    const curMonthName = monthNames[curMonth - 1];
+
+    const optBulan = document.querySelector('#wargaMasjidPeriodeSelect option[value="bulan_ini"]');
+    if (optBulan) optBulan.textContent = `Bulan Berjalan (${curMonthName} ${curYear})`;
+
+    // Filter by Periode
+    let startDate = null;
+    let endDate = null;
+    let periodeLabel = '';
+
+    if (periodeSelect === 'pekan_ini') {
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(today.getDate() - 7);
+      startDate = sevenDaysAgo.toISOString().slice(0, 10);
+      endDate = today.toISOString().slice(0, 10);
+      periodeLabel = `Periode: 7 Hari Terakhir (${startDate} s/d ${endDate})`;
+    } else if (periodeSelect === 'bulan_ini') {
+      startDate = `${curYear}-${String(curMonth).padStart(2, '0')}-01`;
+      const lastDay = new Date(curYear, curMonth, 0).getDate();
+      endDate = `${curYear}-${String(curMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+      periodeLabel = `Periode: Bulan ${curMonthName} ${curYear}`;
+    } else {
+      startDate = null;
+      endDate = null;
+      periodeLabel = 'Periode: Keseluruhan Arus Kas (Semua Waktu)';
+    }
+
+    const elPeriodeLabel = document.getElementById('wargaMasjidPeriodeLabel');
+    if (elPeriodeLabel) elPeriodeLabel.textContent = periodeLabel;
+
+    // Hitung Akumulasi Total Saldo (Semua Waktu)
+    let totalKasUmum = Number(s.saldoAwal || 0);
+    let totalPembangunan = 0;
+    let totalSosial = 0;
+    let totalKotakAhadBulanIni = 0;
+
+    // Hitung Kas Masuk & Keluar pada Periode Terpilih
+    let periodeMasuk = 0;
+    let periodeKeluar = 0;
+
+    txs.forEach(t => {
+      const nom = Number(t.nominal || 0);
+      const isMasuk = t.tipe === 'masuk';
+      const kantong = t.kantong || 'Kas Umum';
+      const tgl = (t.tanggal || '').slice(0, 10);
+      const isThisMonth = tgl.startsWith(currentMonthStr);
+
+      // Kumulatif per kantong
+      if (kantong === 'Kas Umum') {
+        if (isMasuk) totalKasUmum += nom;
+        else totalKasUmum -= nom;
+      } else if (kantong === 'Pembangunan') {
+        if (isMasuk) totalPembangunan += nom;
+        else totalPembangunan -= nom;
+      } else if (kantong === 'Sosial & ZIS') {
+        if (isMasuk) totalSosial += nom;
+        else totalSosial -= nom;
+      }
+
+      // Kotak Jariyah Keliling Ahad Bulan Berjalan
+      if (isThisMonth && isMasuk && (t.kategori === 'Kotak Jariyah Keliling Ahad' || (t.uraian && t.uraian.toLowerCase().includes('ahad')))) {
+        totalKotakAhadBulanIni += nom;
+      }
+
+      // Filter tanggal periode
+      let inPeriod = true;
+      if (startDate && tgl < startDate) inPeriod = false;
+      if (endDate && tgl > endDate) inPeriod = false;
+
+      if (inPeriod) {
+        if (isMasuk) periodeMasuk += nom;
+        else periodeKeluar += nom;
+      }
+    });
+
+    // Tampilkan di KPI Cards
+    const elSaldoTotal = document.getElementById('wargaMasjidSaldoTotal');
+    if (elSaldoTotal) elSaldoTotal.textContent = Utils.formatRupiah(totalKasUmum);
+    const elTotalMasuk = document.getElementById('wargaMasjidTotalMasuk');
+    if (elTotalMasuk) elTotalMasuk.textContent = `+${Utils.formatRupiah(periodeMasuk)}`;
+    const elTotalKeluar = document.getElementById('wargaMasjidTotalKeluar');
+    if (elTotalKeluar) elTotalKeluar.textContent = `-${Utils.formatRupiah(periodeKeluar)}`;
+    const elKotakAhad = document.getElementById('wargaMasjidKotakAhad');
+    if (elKotakAhad) elKotakAhad.textContent = Utils.formatRupiah(totalKotakAhadBulanIni);
+    const elPembangunan = document.getElementById('wargaMasjidSaldoPembangunan');
+    if (elPembangunan) elPembangunan.textContent = Utils.formatRupiah(totalPembangunan);
+    const elSosial = document.getElementById('wargaMasjidSaldoSosial');
+    if (elSosial) elSosial.textContent = Utils.formatRupiah(totalSosial);
+
+    // Filter data tabel rincian
+    let filteredTxs = txs.filter(t => {
+      const tgl = (t.tanggal || '').slice(0, 10);
+      if (startDate && tgl < startDate) return false;
+      if (endDate && tgl > endDate) return false;
+      if (tipeFilter !== 'all' && t.tipe !== tipeFilter) return false;
+      if (searchQuery) {
+        const matchU = (t.uraian || '').toLowerCase().includes(searchQuery);
+        const matchK = (t.kategori || '').toLowerCase().includes(searchQuery);
+        const matchP = (t.pihak || '').toLowerCase().includes(searchQuery);
+        const matchM = (t.metode || '').toLowerCase().includes(searchQuery);
+        if (!matchU && !matchK && !matchP && !matchM) return false;
+      }
+      return true;
+    });
+
+    filteredTxs.sort((a, b) => new Date(b.tanggal || 0) - new Date(a.tanggal || 0));
+
+    const tbody = document.getElementById('wargaMasjidTableBody');
+    if (!tbody) return;
+
+    if (filteredTxs.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: #94a3b8; padding: 24px;">Tidak ada transaksi kas masjid pada periode ini.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = filteredTxs.map((t, idx) => {
+      const isMasuk = t.tipe === 'masuk';
+      const badgeTipe = isMasuk 
+        ? '<span class="badge-masjid-in">Masuk</span>' 
+        : '<span class="badge-masjid-out">Keluar</span>';
+      
+      let badgeKantong = '';
+      if (t.kantong === 'Pembangunan') badgeKantong = '<span class="badge-kantong badge-kantong-pembangunan">Pembangunan</span>';
+      else if (t.kantong === 'Sosial & ZIS') badgeKantong = '<span class="badge-kantong badge-kantong-sosial">Sosial</span>';
+      else badgeKantong = '<span class="badge-kantong badge-kantong-umum">Kas Umum</span>';
+
+      const color = isMasuk ? '#16a34a' : '#be123c';
+      const prefix = isMasuk ? '+' : '-';
+
+      return `
+        <tr>
+          <td style="text-align: center; font-weight: 600; color: #94a3b8;">${idx + 1}</td>
+          <td style="white-space: nowrap; font-weight: 500;">${t.tanggal || '-'}</td>
+          <td>
+            <div style="display: flex; gap: 4px; align-items: center; flex-wrap: wrap;">
+              ${badgeTipe}
+              ${badgeKantong}
+            </div>
+          </td>
+          <td style="font-weight: 600; color: #334155;">${t.kategori || '-'}</td>
+          <td>
+            <div style="font-weight: 600; color: #1e293b;">${t.uraian || '-'}</div>
+          </td>
+          <td>${t.pihak || '-'}</td>
+          <td style="text-align: right; font-weight: 800; color: ${color}; white-space: nowrap;">
+            ${prefix}${Utils.formatRupiah(t.nominal)}
+          </td>
+          <td><span style="font-size: 11px; color: #64748b;">${t.metode || 'Tunai'}</span></td>
+          <td style="text-align: center;">
+            ${isMasuk ? `
+              <button type="button" class="btn-outline-pill" style="font-size: 10.5px; padding: 2px 7px; color: #047857; border-color: #a7f3d0;" onclick="App.printKwitansiMasjid('${t.id}')" title="Lihat Kwitansi Infaq Resmi">
+                🧾 Kwitansi
+              </button>
+            ` : '-'}
           </td>
         </tr>
       `;
