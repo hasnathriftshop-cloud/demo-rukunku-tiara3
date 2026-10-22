@@ -3153,32 +3153,166 @@ textarea.form-control {
 }
 
 .mading-kop {
-  text-align: center;
+  text-align: center !important;
   border-bottom: 3px double #064e3b;
   padding-bottom: 14px;
   margin-bottom: 18px;
   position: relative;
+  width: 100%;
 }
 
 .mading-kop-title {
-  font-size: 20px;
-  font-weight: 900;
+  font-size: 19px;
+  font-weight: 900 !important;
   color: #064e3b;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  text-align: center !important;
+  margin: 0 auto;
 }
 
 .mading-kop-sub {
-  font-size: 14px;
-  font-weight: 700;
-  color: #0f766e;
-  margin-top: 2px;
+  font-size: 13.5px;
+  font-weight: 800 !important;
+  color: #1e293b !important;
+  margin-top: 3px;
+  text-align: center !important;
+  display: block;
 }
 
 .mading-kop-addr {
-  font-size: 11.5px;
+  font-size: 12.5px;
+  font-weight: 800 !important;
+  color: #047857 !important;
+  margin-top: 3px;
+  text-align: center !important;
+  display: block;
+}
+
+/* =========================================================================
+   COMPACT ACTIONS & FILTER TOOLBAR FOR MASJID
+   ========================================================================= */
+.masjid-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-masjid-compact {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.btn-masjid-in {
+  background: #047857;
+  color: #ffffff;
+  border: 1px solid #047857;
+  box-shadow: 0 1px 3px rgba(4, 120, 87, 0.2);
+}
+.btn-masjid-in:hover {
+  background: #065f46;
+  border-color: #065f46;
+}
+
+.btn-masjid-out {
+  background: #ffffff;
+  color: #be123c;
+  border: 1px solid #fecdd3;
+}
+.btn-masjid-out:hover {
+  background: #fff1f2;
+  border-color: #fda4af;
+}
+
+.btn-masjid-reset {
+  background: #ffffff;
   color: #64748b;
-  margin-top: 4px;
+  border: 1px solid #e2e8f0;
+}
+.btn-masjid-reset:hover {
+  color: #dc2626;
+  border-color: #fca5a5;
+  background: #fef2f2;
+}
+
+/* Compact Search & Filter Bar */
+.masjid-filter-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 8px 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.masjid-search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 180px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 5px 10px;
+  transition: all 0.15s;
+}
+.masjid-search-box:focus-within {
+  border-color: #0f766e;
+  background: #ffffff;
+  box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.1);
+}
+.masjid-search-box svg {
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+.masjid-search-input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 12px;
+  width: 100%;
+  color: #1e293b;
+}
+
+.masjid-filter-selects {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.masjid-filter-select {
+  height: 32px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  border-radius: 6px;
+  padding: 0 10px;
+  font-size: 12px;
+  color: #334155;
+  font-weight: 500;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.masjid-filter-select:focus,
+.masjid-filter-select:hover {
+  border-color: #cbd5e1;
+  background: #ffffff;
 }
 
 @media print {
