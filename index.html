@@ -368,9 +368,13 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
             <span>Petugas Penagih Blok</span>
           </a>
-          <a class="sidebar-sublink pengurus-only" onclick="document.getElementById('inputGasUrl').value = CloudSync.getGasUrl(); App.openModal('modalCloudSync');">
+          <a class="sidebar-sublink pengurus-only" onclick="CloudSync.openSyncModal('rt');">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
-            <span>Google Sheets & Cloud</span>
+            <span>Google Sheets RT</span>
+          </a>
+          <a class="sidebar-sublink masjid-only" style="display: none;" onclick="CloudSync.openSyncModal('masjid');">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+            <span>Google Sheets Masjid</span>
           </a>
           <a class="sidebar-sublink masjid-only" style="display: none;" onclick="App.openPengaturanMasjidModal()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -404,7 +408,7 @@
         <!-- Right User Profile & Role Switcher -->
         <div class="header-right">
           <!-- Cloud Sync Pill -->
-          <div class="cloud-sync-pill" id="cloudSyncPill" onclick="document.getElementById('inputGasUrl').value = CloudSync.getGasUrl(); App.openModal('modalCloudSync');" title="Konfigurasi Database Google Sheets">
+          <div class="cloud-sync-pill" id="cloudSyncPill" onclick="CloudSync.openSyncModal();" title="Konfigurasi Database Google Sheets & Cloud Sync">
             <span class="cloud-sync-dot" id="cloudSyncDot"></span>
             <span id="cloudSyncText">Mode: Database Lokal</span>
             <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
@@ -1283,6 +1287,9 @@
               <button class="btn-outline-pill" style="color: #be123c; border-color: #fca5a5; background: #fff1f2;" onclick="App.openCatatKasMasjidModal('keluar')">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 <span>- Catat Pengeluaran</span>
+              </button>
+              <button class="btn-outline-pill" style="color: #dc2626; border-color: #fca5a5; background: #fff5f5; font-size: 12px;" onclick="App.resetMasjidDataToZero()" title="Kosongkan seluruh data transaksi kas masjid & mulai input dari nol">
+                <span>🗑️ Kosongkan Data (Mulai Nol)</span>
               </button>
             </div>
           </div>
@@ -2371,23 +2378,34 @@
   </div>
 
   <!-- ========================================================================
-       MODAL: PENGATURAN DATABASE GOOGLE SHEETS & CLOUD SYNC
+       MODAL: PENGATURAN DATABASE GOOGLE SHEETS & CLOUD SYNC (DUAL-DATABASE)
        ======================================================================== -->
   <div class="modal-overlay" id="modalCloudSync">
-    <div class="modal-card" style="max-width: 620px;">
+    <div class="modal-card" style="max-width: 640px;">
       <div class="modal-header">
-        <h3 class="modal-title" style="display: flex; align-items: center; gap: 8px;">
-          <span>📊 Database Google Sheets & Cloud Sync</span>
+        <h3 class="modal-title" id="modalCloudTitle" style="display: flex; align-items: center; gap: 8px;">
+          <span>📊 Cloud Database Google Sheets</span>
         </h3>
         <button class="btn-close-modal">&times;</button>
       </div>
       <div class="modal-body">
         
+        <!-- Scope Switcher Tabs: RT vs Masjid -->
+        <div style="display: flex; gap: 8px; margin-bottom: 14px; background: #f1f5f9; padding: 4px; border-radius: 12px;">
+          <button type="button" id="btnCloudScopeRt" class="btn-scope-tab active" onclick="CloudSync.switchScopeUI('rt')" style="flex: 1; padding: 8px 12px; border-radius: 9px; font-size: 12.5px; font-weight: 600; cursor: pointer; transition: all 0.2s; border: 1px solid #0f766e; background: #0f766e; color: #ffffff; display: flex; align-items: center; justify-content: center; gap: 6px;">
+            <span>🏢 Database Lingkungan RT</span>
+          </button>
+          <button type="button" id="btnCloudScopeMasjid" class="btn-scope-tab" onclick="CloudSync.switchScopeUI('masjid')" style="flex: 1; padding: 8px 12px; border-radius: 9px; font-size: 12.5px; font-weight: 600; cursor: pointer; transition: all 0.2s; border: 1px solid #cbd5e1; background: #ffffff; color: #64748b; display: flex; align-items: center; justify-content: center; gap: 6px;">
+            <span>🕌 Database Masjid Sabilillah</span>
+          </button>
+        </div>
+
         <!-- Status Box -->
         <div id="modalCloudStatus" style="margin-bottom: 12px;"></div>
         
-        <p style="font-size: 13px; color: #475569; line-height: 1.5;">
-          Hubungkan RukunKu ke Google Sheets menggunakan <strong>Google Apps Script</strong> gratis. Data warga, kas, dan iuran akan tersimpan otomatis di Google Drive Anda dan dapat diakses bersamaan oleh pengurus RT melalui laptop maupun smartphone.
+        <!-- Scope Description -->
+        <p id="modalCloudScopeDesc" style="font-size: 12.5px; color: #475569; line-height: 1.5; margin-bottom: 12px;">
+          Hubungkan RukunKu ke Google Sheets menggunakan <strong>Google Apps Script</strong> gratis. Data warga, kas, dan iuran akan tersimpan otomatis di Google Drive Anda.
         </p>
 
         <div class="form-group" style="margin-top: 10px;">
@@ -2411,9 +2429,11 @@
           <button type="button" class="btn-outline-pill" style="font-size: 12px; padding: 7px 14px;" onclick="CloudSync.pushToSheets()">
             ⬆️ Kirim Data Lokal ke Sheet
           </button>
-          <button type="button" class="btn-outline-pill" style="font-size: 12px; padding: 7px 14px; color: #dc2626;" onclick="
-            if (confirm('Putuskan koneksi ke Google Sheets dan kembali menggunakan database lokal?')) {
-              CloudSync.setGasUrl('');
+          <button type="button" class="btn-outline-pill" style="font-size: 12px; padding: 7px 14px; color: #dc2626; border-color: #fecaca;" onclick="
+            const sc = CloudSync.getActiveScope();
+            const scLabel = sc === 'masjid' ? 'Masjid Sabilillah' : 'Lingkungan RT';
+            if (confirm(`Putuskan koneksi ke Google Sheets untuk database ${scLabel} dan kembali menggunakan database lokal?`)) {
+              CloudSync.setGasUrl('', sc);
               document.getElementById('inputGasUrl').value = '';
               CloudSync.updateStatusUI();
             }
@@ -2422,43 +2442,28 @@
           </button>
         </div>
 
-        <!-- Info Kolom Password -->
-        <div style="background: #f0fdfa; border: 1px solid #ccfbf1; border-radius: 10px; padding: 10px 14px; margin-top: 12px; font-size: 11.5px; color: #0f766e;">
-          <strong>💡 Kolom Password di Google Sheets:</strong> Password warga tersimpan di sheet <strong>Warga</strong> (Kolom O). Jika kolom ini belum muncul di spreadsheet Anda, klik tombol <em>"⬆️ Kirim Data Lokal ke Sheet"</em> untuk memperbarui tabel Google Sheets secara otomatis.
-        </div>
-
         <!-- Panduan Singkat -->
         <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 14px; margin-top: 14px; font-size: 12px; color: #334155;">
-          <div style="font-weight: 700; margin-bottom: 6px; color: #0f766e;">Cara Cepat Mendapatkan URL Google Apps Script:</div>
+          <div style="font-weight: 700; margin-bottom: 6px; color: #0f766e;">Cara Cepat Memasang Database Spreadsheet Mandiri:</div>
           <ol style="margin-left: 18px; line-height: 1.6;">
-            <li>Buka spreadsheet baru di <a href="https://sheets.new" target="_blank" style="color: #0f766e; font-weight: bold;">sheets.new</a></li>
-            <li>Buka menu <strong>Ekstensi &gt; Apps Script</strong></li>
-            <li>Salin seluruh isi kode dari file <code>google-apps-script/Code.gs</code> lalu tempelkan.</li>
+            <li>Buka spreadsheet baru di Google Drive Anda (<a href="https://sheets.new" target="_blank" style="color: #0f766e; font-weight: bold;">sheets.new</a>).</li>
+            <li>Buka menu <strong>Ekstensi &gt; Apps Script</strong>.</li>
+            <li id="modalCloudGuideName">Salin isi kode script backend dari folder <code>google-apps-script/</code> lalu tempelkan.</li>
             <li>Klik tombol <strong>Deploy &gt; New deployment</strong>, pilih jenis <strong>Web app</strong>.</li>
             <li>Ubah <em>Who has access</em> menjadi <strong>Anyone</strong> (Wajib agar bisa diakses aplikasi).</li>
-            <li>Salin <strong>Web app URL</strong> (/exec) lalu tempelkan pada kolom input di atas.</li>
+            <li>Salin <strong>Web app URL</strong> (/exec) lalu tempelkan pada kolom input di atas &amp; klik <em>⚡ Tes Koneksi</em>.</li>
           </ol>
-          <div style="margin-top: 10px;">
-            <button type="button" class="btn-outline-pill" style="font-size: 11.5px; padding: 4px 10px;" onclick="
-              alert('Panduan lengkap dan file Code.gs tersedia di:\nd:\\ANTIGRAFITY\\RukunKu\\google-apps-script\\PANDUAN_SETUP_GOOGLE_SHEETS.md');
+          <div style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap;">
+            <button type="button" class="btn-outline-pill" style="font-size: 11.5px; padding: 5px 12px;" onclick="
+              alert('Panduan lengkap setup 2 spreadsheet terpisah tersedia di:\ngoogle-apps-script/PANDUAN_SETUP_DATABASE_TERPISAH.md\n\nFile script backend:\n• Lingkungan RT: google-apps-script/Code_RT.gs\n• Masjid Sabilillah: google-apps-script/Code_Masjid.gs');
             ">
-              📖 Buka Lokasi File Code.gs & Panduan
+              📖 Buka Petunjuk File &amp; Panduan Terpisah
             </button>
           </div>
         </div>
 
       </div>
-      <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-        <div style="display: flex; gap: 8px;">
-          <button type="button" class="btn-outline-pill" id="btnModalDetailEditResident" style="font-size: 12px; color: #0284c7; border-color: #bae6fd;">
-            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            <span>Edit Data Warga Ini</span>
-          </button>
-          <button type="button" class="btn-outline-pill" id="btnModalDetailDeleteResident" style="font-size: 12px; color: #e11d48; border-color: #fecdd3;">
-            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-            <span>Hapus Warga</span>
-          </button>
-        </div>
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; align-items: center; gap: 10px;">
         <button type="button" class="btn-teal-pill btn-close-modal">Selesai / Tutup</button>
       </div>
     </div>
@@ -2856,6 +2861,17 @@
               <input type="text" id="settingMasjidWa" class="form-control" placeholder="Contoh: 6281234567809">
             </div>
           </div>
+
+          <!-- Danger Zone: Reset Data Masjid -->
+          <div style="margin-top: 18px; padding: 12px 14px; background: #fff5f5; border: 1px dashed #fca5a5; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <div>
+              <div style="font-size: 12px; font-weight: 700; color: #dc2626;">Mulai Pembukuan dari Nol:</div>
+              <div style="font-size: 11px; color: #64748b;">Kosongkan seluruh mutasi kas & aset masjid</div>
+            </div>
+            <button type="button" class="btn-outline-pill" style="color: #dc2626; border-color: #fca5a5; background: #ffffff; font-size: 11.5px; padding: 5px 12px;" onclick="App.resetMasjidDataToZero()">
+              🗑️ Kosongkan Data (Mulai Nol)
+            </button>
+          </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn-outline-pill btn-close-modal">Batal</button>
@@ -2937,10 +2953,10 @@
   </div>
 
   <!-- Scripts with cache-busting -->
-  <script src="js/data.js?v=20261021_11"></script>
-  <script src="js/cloud-sync.js?v=20261021_11"></script>
-  <script src="js/report-pdf.js?v=20261021_11"></script>
-  <script src="js/app.js?v=20261021_11"></script>
+  <script src="js/data.js?v=20261021_14"></script>
+  <script src="js/cloud-sync.js?v=20261021_14"></script>
+  <script src="js/report-pdf.js?v=20261021_14"></script>
+  <script src="js/app.js?v=20261021_14"></script>
 
   <script>
     // Set default date picker values to today (bulletproof ready check)
