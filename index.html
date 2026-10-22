@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
   <!-- Custom Modern Stylesheet -->
-  <link rel="stylesheet" href="css/style.css?v=20261022_03">
+  <link rel="stylesheet" href="css/style.css?v=20261022_04">
 </head>
 <body>
 
@@ -74,14 +74,14 @@
         <form onsubmit="App.loginSubmit(event)">
           <div class="form-group">
             <label class="form-label" id="authUsernameLabel">Username Pengurus *</label>
-            <input type="text" id="authUsername" class="form-control" placeholder="User" value="" required autocomplete="username">
+            <input type="text" id="authUsername" class="form-control" placeholder="Contoh: admin atau nama pengurus" value="" required autocomplete="off">
             <span id="authUsernameHint" style="display: none;"></span>
           </div>
 
           <div class="form-group" style="margin-top: 10px;">
             <label class="form-label" id="authPasswordLabel">Password Akun *</label>
             <div style="position: relative; display: flex; align-items: center;">
-              <input type="password" id="authPassword" class="form-control" placeholder="Password" value="" required style="padding-right: 42px;" autocomplete="current-password">
+              <input type="password" id="authPassword" class="form-control" placeholder="Password akun" value="" required style="padding-right: 42px;" autocomplete="new-password">
               <button type="button" class="btn-eye-toggle" onclick="App.toggleInputPassword('authPassword', this)" title="Lihat/Sembunyikan Password">👁️</button>
             </div>
           </div>
@@ -90,12 +90,6 @@
             <button type="submit" class="btn-teal-pill" style="width: 100%; justify-content: center; padding: 13px; font-size: 14px;">
               Masuk ke Sistem
             </button>
-          </div>
-
-          <div style="display: flex; gap: 8px; justify-content: center; margin-top: 14px; flex-wrap: wrap;">
-            <button type="button" class="btn-outline-pill" style="font-size: 11.5px; padding: 4px 10px;" onclick="App.fillDemoLogin('pengurus')">🔑 Demo RT (admin)</button>
-            <button type="button" class="btn-outline-pill" style="font-size: 11.5px; padding: 4px 10px; color: #047857; border-color: #a7f3d0;" onclick="App.fillDemoLogin('admin_masjid')">🕌 Demo Masjid (masjid)</button>
-            <button type="button" class="btn-outline-pill" style="font-size: 11.5px; padding: 4px 10px;" onclick="App.fillDemoLogin('warga')">👨‍👩‍👧‍👦 Demo Warga</button>
           </div>
         </form>
       </div>
@@ -442,27 +436,32 @@
              ================================================================== -->
         <section id="view-dashboard" class="view-panel active-view">
           
-          <!-- Top Row: Page Title + Teal Download Report Button -->
+          <!-- Top Row: Page Title + Actions -->
           <div class="page-title-row">
             <div>
               <h1 class="page-title" id="dashboardMainTitle">Buku Kas & Transaksi</h1>
               <p class="page-subtitle" id="dashboardMainSubtitle">Ringkasan arus kas keuangan dan status iuran lingkungan <span class="display-rt-name">RT</span> <span class="display-perumahan"></span></p>
             </div>
-            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-              <button class="btn-teal-pill pengurus-only" onclick="App.openModal('modalCatatKas')">
+            <!-- RT Mode Actions -->
+            <div class="pengurus-only" style="display: flex; gap: 10px; flex-wrap: wrap;">
+              <button class="btn-teal-pill" onclick="App.openModal('modalCatatKas')">
                 <svg viewBox="0 0 24 24" fill="none"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 <span>Catat Transaksi</span>
               </button>
-              <button class="btn-teal-pill masjid-only" style="display: none; background: #047857;" onclick="App.openCatatKasMasjidModal('masuk')">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                <span>+ Catat Infaq / Donasi</span>
-              </button>
-              <button class="btn-outline-pill masjid-only" style="display: none; color: #be123c; border-color: #fca5a5; background: #fff1f2;" onclick="App.openCatatKasMasjidModal('keluar')">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                <span>- Catat Pengeluaran</span>
-              </button>
               <button class="btn-teal-pill btn-download-report">
                 <svg viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span>Download report</span>
+              </button>
+            </div>
+            <!-- Masjid Mode Actions: 3 Vertical Menu Buttons -->
+            <div class="masjid-only masjid-header-v-actions" style="display: none;">
+              <button type="button" class="btn-masjid-v btn-masjid-in" onclick="App.openCatatKasMasjidModal('masuk')">
+                <span>Catat Infaq / Donasi</span>
+              </button>
+              <button type="button" class="btn-masjid-v btn-masjid-out" onclick="App.openCatatKasMasjidModal('keluar')">
+                <span>Catat Pengeluaran</span>
+              </button>
+              <button type="button" class="btn-masjid-v btn-masjid-sub btn-download-report" onclick="App.printLaporanMadingJumat()">
                 <span>Download report</span>
               </button>
             </div>
@@ -1087,22 +1086,20 @@
           <div class="page-title-row">
             <div>
               <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="font-size: 26px;">🕌</span>
+                <span style="font-size: 22px;">🕌</span>
                 <h1 class="page-title" id="masjidHeaderTitle">Dashboard Masjid Sabilillah</h1>
               </div>
               <p class="page-subtitle" id="masjidHeaderSubtitle">Dewan Kemakmuran Masjid (DKM) • Transparansi Keuangan, Kotak Amal, & Aset Jemaah</p>
             </div>
-            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-              <button class="btn-teal-pill" style="background: #047857;" onclick="App.openCatatKasMasjidModal('masuk')">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                <span>+ Catat Infaq / Donasi</span>
+            <div class="masjid-header-v-actions">
+              <button type="button" class="btn-masjid-v btn-masjid-in" onclick="App.openCatatKasMasjidModal('masuk')">
+                <span>Catat Infaq / Donasi</span>
               </button>
-              <button class="btn-outline-pill" style="color: #be123c; border-color: #fca5a5; background: #fff1f2;" onclick="App.openCatatKasMasjidModal('keluar')">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                <span>- Catat Pengeluaran</span>
+              <button type="button" class="btn-masjid-v btn-masjid-out" onclick="App.openCatatKasMasjidModal('keluar')">
+                <span>Catat Pengeluaran</span>
               </button>
-              <button class="btn-outline-pill" onclick="App.switchTab('masjid-laporan')">
-                <span>🖨️ Cetak Mading</span>
+              <button type="button" class="btn-masjid-v btn-masjid-sub" onclick="App.switchTab('masjid-laporan')">
+                <span>Cetak Mading</span>
               </button>
             </div>
           </div>
@@ -1293,17 +1290,14 @@
               <h1 class="page-title">Buku Kas & Penerimaan Dana Masjid</h1>
               <p class="page-subtitle">Pencatatan kas masuk (infaq jumat, kotak keliling, wakaf) dan pengeluaran operasional DKM</p>
             </div>
-            <div class="masjid-header-actions">
-              <button type="button" class="btn-masjid-compact btn-masjid-in" onclick="App.openCatatKasMasjidModal('masuk')">
-                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                <span>+ Catat Pemasukan</span>
+            <div class="masjid-header-v-actions">
+              <button type="button" class="btn-masjid-v btn-masjid-in" onclick="App.openCatatKasMasjidModal('masuk')">
+                <span>Catat Infaq / Donasi</span>
               </button>
-              <button type="button" class="btn-masjid-compact btn-masjid-out" onclick="App.openCatatKasMasjidModal('keluar')">
-                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                <span>- Catat Pengeluaran</span>
+              <button type="button" class="btn-masjid-v btn-masjid-out" onclick="App.openCatatKasMasjidModal('keluar')">
+                <span>Catat Pengeluaran</span>
               </button>
-              <button type="button" class="btn-masjid-compact btn-masjid-reset" onclick="App.resetMasjidDataToZero()" title="Kosongkan data kas masjid & mulai input dari nol">
-                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+              <button type="button" class="btn-masjid-v btn-masjid-reset" onclick="App.resetMasjidDataToZero()" title="Kosongkan data kas masjid & mulai input dari nol">
                 <span>Kosongkan Data</span>
               </button>
             </div>
@@ -3042,10 +3036,10 @@
   </div>
 
   <!-- Scripts with cache-busting -->
-  <script src="js/data.js?v=20261022_03"></script>
-  <script src="js/cloud-sync.js?v=20261022_03"></script>
-  <script src="js/report-pdf.js?v=20261022_03"></script>
-  <script src="js/app.js?v=20261022_03"></script>
+  <script src="js/data.js?v=20261022_04"></script>
+  <script src="js/cloud-sync.js?v=20261022_04"></script>
+  <script src="js/report-pdf.js?v=20261022_04"></script>
+  <script src="js/app.js?v=20261022_04"></script>
 
   <script>
     // Set default date picker values to today (bulletproof ready check)
