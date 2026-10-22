@@ -263,13 +263,6 @@ const App = {
     AppState.activeTab = tabName;
     this.data = DB.load(); // Selalu pastikan membaca data terbaru dari storage saat pindah tab
 
-    // Auto-pull dari Google Sheets secara halus saat pindah ke menu utama jika sudah lebih dari 10 detik
-    if (window.CloudSync && typeof window.CloudSync.pullFromSheets === 'function' && window.CloudSync.getGasUrl()) {
-      if (Date.now() - (window.CloudSync.lastPullTimestamp || 0) > 10000) {
-        window.CloudSync.pullFromSheets({ silent: true });
-      }
-    }
-
     // Update Desktop Nav
     document.querySelectorAll('.nav-link').forEach(link => {
       if (link.getAttribute('data-tab') === tabName) {
@@ -548,8 +541,16 @@ const App = {
     }
 
     if (isMasjid) {
+      if (window.CloudSync) {
+        window.CloudSync.currentScope = 'masjid';
+        window.CloudSync.updateStatusUI();
+      }
       this.renderMasjidDashboard();
     } else {
+      if (window.CloudSync) {
+        window.CloudSync.currentScope = 'rt';
+        window.CloudSync.updateStatusUI();
+      }
       this.renderDashboard();
     }
     this.updateNotificationBadge();
@@ -1531,6 +1532,10 @@ const App = {
       AppState.currentUser = null;
       AppState.currentRole = 'pengurus';
       AppState.currentResidentId = null;
+      if (window.CloudSync) {
+        window.CloudSync.currentScope = null;
+        window.CloudSync.updateStatusUI();
+      }
       this.data = DB.load(); // Refresh data dari storage
 
       // PENTING: Tutup SEMUA modal overlay yang mungkin masih terbuka saat logout
@@ -6489,6 +6494,10 @@ const App = {
     this.data.masjidTransactions.unshift(newTx);
     DB.save(this.data);
 
+    if (window.CloudSync && window.CloudSync.getGasUrl('masjid')) {
+      window.CloudSync.saveMasjidTransactionDirect(newTx);
+    }
+
     this.closeModal('modalCatatKasMasjid');
     this.renderMasjidDashboard();
     this.renderMasjidKas();
@@ -6510,6 +6519,16 @@ const App = {
     if (confirm(`Yakin ingin menghapus transaksi ini?\n\n"${tx.uraian}" (${Utils.formatRupiah(tx.nominal)})`)) {
       this.data.masjidTransactions = (this.data.masjidTransactions || []).filter(t => t.id !== id);
       DB.save(this.data);
+
+      if (window.CloudSync) {
+        if (window.CloudSync.getGasUrl('masjid')) {
+          window.CloudSync.deleteMasjidTransactionDirect(id);
+          window.CloudSync.syncNow('masjid');
+        } else if (window.CloudSync.getGasUrl('rt')) {
+          window.CloudSync.syncNow('rt');
+        }
+      }
+
       this.renderMasjidDashboard();
       this.renderMasjidKas();
       this.renderMasjidLaporan();
@@ -6611,6 +6630,12 @@ const App = {
     }
 
     DB.save(this.data);
+
+    if (window.CloudSync && window.CloudSync.getGasUrl('masjid')) {
+      const savedAsset = (this.data.masjidAssets || []).find(a => a.id === (id || newId));
+      if (savedAsset) window.CloudSync.saveMasjidAssetDirect(savedAsset);
+    }
+
     this.closeModal('modalKelolaAsetMasjid');
     this.renderMasjidAset();
     this.renderMasjidDashboard();
@@ -6624,6 +6649,16 @@ const App = {
     if (confirm(`Yakin ingin menghapus aset "${asset.nama}"?`)) {
       this.data.masjidAssets = (this.data.masjidAssets || []).filter(a => a.id !== id);
       DB.save(this.data);
+
+      if (window.CloudSync) {
+        if (window.CloudSync.getGasUrl('masjid')) {
+          window.CloudSync.deleteMasjidAssetDirect(id);
+          window.CloudSync.syncNow('masjid');
+        } else if (window.CloudSync.getGasUrl('rt')) {
+          window.CloudSync.syncNow('rt');
+        }
+      }
+
       this.renderMasjidAset();
       this.renderMasjidDashboard();
       alert("Aset berhasil dihapus.");
@@ -6741,6 +6776,113 @@ const App = {
 
   printLaporanMadingJumat() {
     window.print();
+  },
+
+  // Reset & Kosongkan Data Masjid untuk Mencoba dari Nol
+  resetMasjidDataToZero() {
+    const confirmed = confirm(
+      "⚠️ KONFIRMASI KOSONGKAN DATA MASJID\n\n" +
+      "Tindakan ini akan:\n" +
+      "1. Menghapus seluruh riwayat transaksi kas masuk & keluar masjid (menjadi 0 transaksi).\n" +
+      "2. Mengatur saldo kas awal masjid menjadi Rp 0.\n" +
+      "3. Mengosongkan daftar inventaris & aset masjid.\n\n" +
+      "Pengaturan profil DKM (nama masjid, rekening, dan pengurus) tetap aman tersimpan.\n\n" +
+      "Apakah Anda yakin ingin mengosongkan semua data untuk mulai mencoba input dari nol?"
+    );
+
+    if (!confirmed) return;
+
+    // Reset arrays
+    this.data.masjidTransactions = [];
+    this.data.masjidAssets = [];
+    if (this.data.masjidSettings) {
+      this.data.masjidSettings.saldoAwal = 0;
+    }
+
+    DB.save(this.data);
+
+    // Sync immediate to Google Sheets if connected so Google Sheets is also cleared
+    if (window.CloudSync) {
+      if (window.CloudSync.getGasUrl('masjid')) {
+        if (typeof window.CloudSync.resetMasjidDataDirect === 'function') {
+          window.CloudSync.resetMasjidDataDirect();
+        }
+        if (typeof window.CloudSync.syncNow === 'function') {
+          window.CloudSync.syncNow('masjid');
+        }
+      } else if (window.CloudSync.getGasUrl('rt')) {
+        if (typeof window.CloudSync.syncNow === 'function') {
+          window.CloudSync.syncNow('rt');
+        }
+      }
+    }
+
+    // Close any modal that might be open
+    document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
+
+    this.renderMasjidDashboard();
+    this.renderMasjidKas();
+    this.renderMasjidAset();
+    this.renderMasjidLaporan();
+
+    alert(
+      "✅ Seluruh data masjid berhasil dikosongkan!\n\n" +
+      "• Total Saldo Kas: Rp 0\n" +
+      "• Total Transaksi Kas: 0\n" +
+      "• Total Inventaris Aset: 0\n\n" +
+      "Silakan coba mencatat kas masuk / pengeluaran baru dari nol melalui tombol '+ Catat Pemasukan'."
+    );
+  },
+
+  // Reset Seluruh Data (RT & Masjid)
+  resetAllDataToZero() {
+    const confirmed = confirm(
+      "🚨 PERINGATAN: RESET SELURUH SISTEM RUKUNKU\n\n" +
+      "Tindakan ini akan mengosongkan SEMUA data di lingkungan RT dan Masjid:\n" +
+      "• Data Warga RT & KK dikosongkan\n" +
+      "• Transaksi Kas RT & Iuran dikosongkan\n" +
+      "• Transaksi Kas Masjid & Aset dikosongkan (Saldo Rp 0)\n" +
+      "• Talangan & Setoran dikosongkan\n\n" +
+      "Apakah Anda yakin ingin memulai semuanya dari nol?"
+    );
+
+    if (!confirmed) return;
+
+    const secondConfirm = prompt("Ketik 'RESET' (huruf besar) untuk melanjutkan pengosongan seluruh data:");
+    if (secondConfirm !== 'RESET') {
+      alert("Pengosongan data dibatalkan.");
+      return;
+    }
+
+    this.data.residents = [];
+    this.data.transactions = [];
+    this.data.duesMatrix = {};
+    this.data.talangan = [];
+    this.data.setoranBlok = [];
+    this.data.masjidTransactions = [];
+    this.data.masjidAssets = [];
+    if (this.data.masjidSettings) this.data.masjidSettings.saldoAwal = 0;
+
+    DB.save(this.data);
+
+    if (window.CloudSync && typeof window.CloudSync.syncNow === 'function' && window.CloudSync.getGasUrl()) {
+      window.CloudSync.syncNow();
+    }
+
+    if (AppState.currentRole === 'admin_masjid') {
+      this.renderMasjidDashboard();
+      this.renderMasjidKas();
+      this.renderMasjidAset();
+      this.renderMasjidLaporan();
+    } else {
+      this.renderDashboard();
+      this.renderResidents();
+      this.renderTransactions();
+      this.renderDuesMatrix();
+      this.renderFinancialReport();
+    }
+
+    alert("✅ Seluruh data RT dan Masjid telah berhasil dikosongkan dari nol!");
   },
 
   // Modal helpers
