@@ -13,7 +13,16 @@ const ReportGenerator = {
   generateReportHTML(period = null) {
     const data = DB.load();
     const settings = data.settings;
-    const transactions = data.transactions;
+    const allTransactions = data.transactions || [];
+    const transactions = allTransactions.filter(t => {
+      const id = String(t.id || '').toUpperCase();
+      if (id.startsWith('MSJ-') || id.startsWith('MSJ_')) return false;
+      if (t.kantong && String(t.kantong).trim() !== '') return false;
+      const kat = String(t.kategori || '').toLowerCase();
+      const jud = String(t.judul || t.uraian || '').toLowerCase();
+      const kw = ['kotak amal', 'jariyah', 'infaq', 'infak', 'wakaf', 'marbot', 'muazin', 'masjid', 'zis', 'zakat', 'dkm', 'phbi'];
+      return !kw.some(k => kat.includes(k) || jud.includes(k));
+    });
     const talangan = data.talangan;
     const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
     if (!period) {
