@@ -480,6 +480,9 @@ const App = {
       if (dashboardTitleText) dashboardTitleText.textContent = 'Dashboard Kas Masjid Sabilillah';
       if (dashboardSubText) dashboardSubText.textContent = 'Dewan Kemakmuran Masjid (DKM) • Transparansi Keuangan, Kotak Amal, & Aset';
 
+      // Sembunyikan transaksi/iuran RT & capaian iuran khusus RT dari dashboard kas masjid
+      document.querySelectorAll('.bottom-dashboard-grid').forEach(el => el.style.display = 'none');
+
       // Show masjid-only controls, hide RT-specific controls
       document.querySelectorAll('.masjid-only').forEach(el => el.style.display = '');
       document.querySelectorAll('.pengurus-only').forEach(el => el.style.display = 'none');
@@ -496,6 +499,7 @@ const App = {
       if (dashboardSubText) dashboardSubText.textContent = `Kelola keuangan, iuran, dan administrasi ${this.data.settings.rtName} ${this.data.settings.perumahan}`;
 
       // Show pengurus & pengurus-petugas controls
+      document.querySelectorAll('.bottom-dashboard-grid').forEach(el => el.style.display = '');
       document.querySelectorAll('.pengurus-only').forEach(el => el.style.display = '');
       document.querySelectorAll('.pengurus-petugas-only').forEach(el => el.style.display = '');
       document.querySelectorAll('.petugas-only').forEach(el => el.style.display = 'none');
@@ -1726,7 +1730,8 @@ const App = {
     const curYear = AppState.selectedYear || new Date().getFullYear();
     const curMonth = AppState.selectedMonth || (new Date().getMonth() + 1);
     const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
-    const transactions = this.data.transactions || [];
+    const isMasjid = AppState.currentRole === 'admin_masjid';
+    const transactions = isMasjid ? (this.data.masjidTransactions || []) : (this.data.transactions || []);
 
     // Toggle monthly class for horizontal scroll width on mobile
     if (chartCanvas) {
@@ -5915,7 +5920,11 @@ const App = {
     // Update hero profile information
     const heroRek = document.getElementById('dkmHeroRekening');
     if (heroRek) {
-      heroRek.textContent = `${s.noRekening || '712-345-6789'}`;
+      const rawRek = s.noRekening || s.nomorRekening || 'BSI 712-345-6789 a.n DKM Masjid Sabilillah';
+      const cleanRek = rawRek.replace(/(BSI\s*)+/gi, 'BSI ')
+                             .replace(/(\s*a\.n\s+DKM)+/gi, ' a.n DKM')
+                             .replace(/\s+/g, ' ').trim();
+      heroRek.textContent = cleanRek;
     }
     const dkmKetua = document.getElementById('dkmDisplayKetua');
     if (dkmKetua) dkmKetua.textContent = s.ketuaDkm || 'H. Ahmad Fauzi';
@@ -5925,6 +5934,18 @@ const App = {
     if (dkmSekretaris) dkmSekretaris.textContent = s.sekretaris || 'Ust. M. Ridwan';
     const dkmMarbot = document.getElementById('dkmDisplayMarbot');
     if (dkmMarbot) dkmMarbot.textContent = s.marbot || 'Bpk. Subur & Bpk. Warsito';
+
+    // Update Jariyah Ahad Info Card
+    const jJudul = document.getElementById('dkmJariyahJudul');
+    if (jJudul) jJudul.textContent = s.jariyahJudul || 'Kotak Jariyah Keliling Ahad';
+    const jWaktu = document.getElementById('dkmJariyahWaktu');
+    if (jWaktu) jWaktu.textContent = s.jariyahWaktu || 'Setiap hari Minggu pagi (07.00 - 08.30)';
+    const jDesk = document.getElementById('dkmJariyahDeskripsi');
+    if (jDesk) jDesk.textContent = s.jariyahDeskripsi || 'Program rutin jemput jariyah warga lingkungan perumahan untuk operasional masjid & santunan dhuafa.';
+    const jJadwal = document.getElementById('dkmJariyahJadwal');
+    if (jJadwal) jJadwal.textContent = s.jariyahJadwal || 'Tiap Ahad Pagi';
+    const jPetugas = document.getElementById('dkmJariyahPetugas');
+    if (jPetugas) jPetugas.textContent = s.jariyahPetugas || 'Bpk. Subur & Bpk. Warsito (Blok A, B, C, D)';
 
     // Calculate Balances
     // Saldo Kas Umum = saldoAwal + (masuk kas umum) - (keluar kas umum)
@@ -6671,7 +6692,7 @@ const App = {
     if (!modal) return;
 
     const namaIn = document.getElementById('settingMasjidNama');
-    if (namaIn) namaIn.value = s.nama || 'Masjid Sabilillah';
+    if (namaIn) namaIn.value = s.nama || s.namaMasjid || 'Masjid Sabilillah';
     const alamatIn = document.getElementById('settingMasjidAlamat');
     if (alamatIn) alamatIn.value = s.alamat || '';
     const ketuaIn = document.getElementById('settingMasjidKetua');
@@ -6682,10 +6703,30 @@ const App = {
     if (sekIn) sekIn.value = s.sekretaris || '';
     const marbotIn = document.getElementById('settingMasjidMarbot');
     if (marbotIn) marbotIn.value = s.marbot || '';
+
     const rekIn = document.getElementById('settingMasjidRekening');
-    if (rekIn) rekIn.value = `${s.bank || 'BSI'} ${s.noRekening || ''} a.n ${s.atasNama || 'DKM'}`;
+    if (rekIn) {
+      const rawRek = s.noRekening || s.nomorRekening || 'BSI 712-345-6789 a.n DKM Masjid Sabilillah';
+      const cleanRek = rawRek.replace(/(BSI\s*)+/gi, 'BSI ')
+                             .replace(/(\s*a\.n\s+DKM)+/gi, ' a.n DKM')
+                             .replace(/\s+/g, ' ').trim();
+      rekIn.value = cleanRek;
+    }
+
     const waIn = document.getElementById('settingMasjidWa');
-    if (waIn) waIn.value = s.teleponWa || '';
+    if (waIn) waIn.value = s.teleponWa || s.contactWa || '';
+
+    // Prefill Jariyah Ahad form inputs
+    const jJudulIn = document.getElementById('settingMasjidJariyahJudul');
+    if (jJudulIn) jJudulIn.value = s.jariyahJudul || 'Kotak Jariyah Keliling Ahad';
+    const jWaktuIn = document.getElementById('settingMasjidJariyahWaktu');
+    if (jWaktuIn) jWaktuIn.value = s.jariyahWaktu || 'Setiap hari Minggu pagi (07.00 - 08.30)';
+    const jDeskIn = document.getElementById('settingMasjidJariyahDeskripsi');
+    if (jDeskIn) jDeskIn.value = s.jariyahDeskripsi || 'Program rutin jemput jariyah warga lingkungan perumahan untuk operasional masjid & santunan dhuafa.';
+    const jJadwalIn = document.getElementById('settingMasjidJariyahJadwal');
+    if (jJadwalIn) jJadwalIn.value = s.jariyahJadwal || 'Tiap Ahad Pagi';
+    const jPetugasIn = document.getElementById('settingMasjidJariyahPetugas');
+    if (jPetugasIn) jPetugasIn.value = s.jariyahPetugas || 'Bpk. Subur & Bpk. Warsito (Blok A, B, C, D)';
 
     modal.classList.add('active');
   },
@@ -6696,6 +6737,7 @@ const App = {
     const s = this.data.masjidSettings;
 
     s.nama = document.getElementById('settingMasjidNama')?.value.trim() || s.nama;
+    s.namaMasjid = s.nama;
     s.alamat = document.getElementById('settingMasjidAlamat')?.value.trim() || s.alamat;
     s.ketuaDkm = document.getElementById('settingMasjidKetua')?.value.trim() || s.ketuaDkm;
     s.bendahara = document.getElementById('settingMasjidBendahara')?.value.trim() || s.bendahara;
@@ -6705,15 +6747,74 @@ const App = {
     const rawRek = document.getElementById('settingMasjidRekening')?.value.trim() || '';
     if (rawRek) {
       s.noRekening = rawRek;
+      s.nomorRekening = rawRek;
     }
     s.teleponWa = document.getElementById('settingMasjidWa')?.value.trim() || s.teleponWa;
+    s.contactWa = s.teleponWa;
+
+    // Simpan data Jariyah Ahad jika ada input
+    const jJudulIn = document.getElementById('settingMasjidJariyahJudul')?.value.trim();
+    if (jJudulIn) s.jariyahJudul = jJudulIn;
+    const jWaktuIn = document.getElementById('settingMasjidJariyahWaktu')?.value.trim();
+    if (jWaktuIn) s.jariyahWaktu = jWaktuIn;
+    const jDeskIn = document.getElementById('settingMasjidJariyahDeskripsi')?.value.trim();
+    if (jDeskIn) s.jariyahDeskripsi = jDeskIn;
+    const jJadwalIn = document.getElementById('settingMasjidJariyahJadwal')?.value.trim();
+    if (jJadwalIn) s.jariyahJadwal = jJadwalIn;
+    const jPetugasIn = document.getElementById('settingMasjidJariyahPetugas')?.value.trim();
+    if (jPetugasIn) s.jariyahPetugas = jPetugasIn;
 
     DB.save(this.data);
     this.closeModal('modalPengaturanMasjid');
     this.renderMasjidDashboard();
     this.renderMasjidKas();
     this.renderMasjidLaporan();
-    alert("Pengaturan profil DKM Masjid Sabilillah berhasil diperbarui!");
+
+    if (window.CloudSync && (window.CloudSync.getGasUrl('masjid') || window.CloudSync.getGasUrl('rt'))) {
+      window.CloudSync.syncNow('masjid');
+    }
+
+    alert("✅ Pengaturan profil DKM & Program Masjid Sabilillah berhasil diperbarui!");
+  },
+
+  // Modal Khusus Edit Informasi Kotak Jariyah Keliling Ahad
+  openEditJariyahModal() {
+    const s = this.data.masjidSettings || {};
+    const jJudul = document.getElementById('editJariyahJudul');
+    const jWaktu = document.getElementById('editJariyahWaktu');
+    const jDesk = document.getElementById('editJariyahDeskripsi');
+    const jJadwal = document.getElementById('editJariyahJadwal');
+    const jPetugas = document.getElementById('editJariyahPetugas');
+
+    if (jJudul) jJudul.value = s.jariyahJudul || 'Kotak Jariyah Keliling Ahad';
+    if (jWaktu) jWaktu.value = s.jariyahWaktu || 'Setiap hari Minggu pagi (07.00 - 08.30)';
+    if (jDesk) jDesk.value = s.jariyahDeskripsi || 'Program rutin jemput jariyah warga lingkungan perumahan untuk operasional masjid & santunan dhuafa.';
+    if (jJadwal) jJadwal.value = s.jariyahJadwal || 'Tiap Ahad Pagi';
+    if (jPetugas) jPetugas.value = s.jariyahPetugas || 'Bpk. Subur & Bpk. Warsito (Blok A, B, C, D)';
+
+    this.openModal('modalEditJariyahAhad');
+  },
+
+  saveEditJariyahAhad(event) {
+    event.preventDefault();
+    if (!this.data.masjidSettings) this.data.masjidSettings = {};
+    const s = this.data.masjidSettings;
+
+    s.jariyahJudul = (document.getElementById('editJariyahJudul')?.value || '').trim() || 'Kotak Jariyah Keliling Ahad';
+    s.jariyahWaktu = (document.getElementById('editJariyahWaktu')?.value || '').trim() || 'Setiap hari Minggu pagi (07.00 - 08.30)';
+    s.jariyahDeskripsi = (document.getElementById('editJariyahDeskripsi')?.value || '').trim() || 'Program rutin jemput jariyah warga lingkungan perumahan untuk operasional masjid & santunan dhuafa.';
+    s.jariyahJadwal = (document.getElementById('editJariyahJadwal')?.value || '').trim() || 'Tiap Ahad Pagi';
+    s.jariyahPetugas = (document.getElementById('editJariyahPetugas')?.value || '').trim() || 'Bpk. Subur & Bpk. Warsito (Blok A, B, C, D)';
+
+    DB.save(this.data);
+    this.closeModal('modalEditJariyahAhad');
+    this.renderMasjidDashboard();
+
+    if (window.CloudSync && (window.CloudSync.getGasUrl('masjid') || window.CloudSync.getGasUrl('rt'))) {
+      window.CloudSync.syncNow('masjid');
+    }
+
+    alert("✅ Informasi Program Kotak Jariyah Keliling Ahad berhasil diperbarui!");
   },
 
   printKwitansiMasjid(txId) {
