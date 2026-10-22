@@ -492,6 +492,10 @@ const App = {
       this.data.duesMatrix[resId][mNum] = status;
       this.data.duesMatrix[resId][mStr] = status;
     }
+
+    if (window.SupabaseSync && typeof window.SupabaseSync.updateDuesDirect === 'function') {
+      window.SupabaseSync.updateDuesDirect(resId, yStr, mNum, status);
+    }
   },
 
   onDuesYearChange(year) {
@@ -1767,7 +1771,10 @@ const App = {
 
     DB.save(this.data);
 
-    // Sync direct to Google Sheets so this registration is instantly persisted to cloud
+    // Sync direct to Supabase & Google Sheets
+    if (window.SupabaseSync && typeof window.SupabaseSync.saveResidentDirect === 'function') {
+      window.SupabaseSync.saveResidentDirect(newResident);
+    }
     if (window.CloudSync && typeof window.CloudSync.saveResidentDirect === 'function') {
       window.CloudSync.saveResidentDirect(newResident);
     }
@@ -2783,6 +2790,9 @@ const App = {
       }
       DB.save(this.data);
 
+      if (window.SupabaseSync && typeof window.SupabaseSync.deleteResidentDirect === 'function') {
+        ids.forEach(id => window.SupabaseSync.deleteResidentDirect(id));
+      }
       if (window.CloudSync && typeof window.CloudSync.deleteResidentDirect === 'function') {
         ids.forEach(id => window.CloudSync.deleteResidentDirect(id));
       }
@@ -2913,7 +2923,10 @@ const App = {
 
     DB.save(this.data);
 
-    // Sync direct to Google Sheets
+    // Sync direct to Supabase & Google Sheets
+    if (savedResident && window.SupabaseSync && typeof window.SupabaseSync.saveResidentDirect === 'function') {
+      window.SupabaseSync.saveResidentDirect(savedResident);
+    }
     if (savedResident && window.CloudSync && typeof window.CloudSync.saveResidentDirect === 'function') {
       window.CloudSync.saveResidentDirect(savedResident);
     }
@@ -2962,7 +2975,10 @@ const App = {
         });
       }
       DB.save(this.data);
-      // Sync delete to Google Sheets
+      // Sync delete to Supabase & Google Sheets
+      if (window.SupabaseSync && typeof window.SupabaseSync.deleteResidentDirect === 'function') {
+        window.SupabaseSync.deleteResidentDirect(id);
+      }
       if (window.CloudSync && typeof window.CloudSync.deleteResidentDirect === 'function') {
         window.CloudSync.deleteResidentDirect(id);
       }
@@ -3148,6 +3164,9 @@ const App = {
     }
 
     DB.save(this.data);
+    if (window.SupabaseSync && typeof window.SupabaseSync.saveTransactionDirect === 'function') {
+      window.SupabaseSync.saveTransactionDirect(newTx);
+    }
     this.closeModal('modalCatatKas');
     this.renderTransactions();
     this.renderDashboard();
@@ -3159,6 +3178,9 @@ const App = {
     if (confirm("Yakin ingin menghapus transaksi ini dari buku kas?")) {
       this.data.transactions = (this.data.transactions || []).filter(t => t.id !== id);
       DB.save(this.data);
+      if (window.SupabaseSync && typeof window.SupabaseSync.deleteTransactionDirect === 'function') {
+        window.SupabaseSync.deleteTransactionDirect(id);
+      }
       if (window.CloudSync && typeof window.CloudSync.syncNow === 'function') {
         window.CloudSync.syncNow('rt');
       }
@@ -4306,7 +4328,10 @@ const App = {
     this.data.setoranBlok.unshift(newSetoran);
     DB.save(this.data);
 
-    // Sync direct to Google Sheets
+    // Sync direct to Supabase & Google Sheets
+    if (window.SupabaseSync && typeof window.SupabaseSync.saveSetoranDirect === 'function') {
+      window.SupabaseSync.saveSetoranDirect(newSetoran);
+    }
     if (window.CloudSync && typeof window.CloudSync.saveSetoranDirect === 'function') {
       window.CloudSync.saveSetoranDirect(newSetoran);
     }
@@ -4350,7 +4375,11 @@ const App = {
 
       DB.save(this.data);
 
-      // Sync direct to Google Sheets
+      // Sync direct to Supabase & Google Sheets
+      if (window.SupabaseSync) {
+        if (typeof window.SupabaseSync.saveSetoranDirect === 'function') window.SupabaseSync.saveSetoranDirect(item);
+        if (typeof window.SupabaseSync.saveTransactionDirect === 'function') window.SupabaseSync.saveTransactionDirect(newTx);
+      }
       if (window.CloudSync) {
         if (typeof window.CloudSync.saveSetoranDirect === 'function') window.CloudSync.saveSetoranDirect(item);
         if (typeof window.CloudSync.saveTransactionDirect === 'function') window.CloudSync.saveTransactionDirect(newTx);
@@ -4799,7 +4828,10 @@ const App = {
     if (confirm(`Yakin ingin menghapus / mencabut penugasan akun petugas "${col.nama}" (${col.blokTugas})?\n\nCatatan: Data ${col.nama} sebagai warga RT tetap tersimpan aman di database.`)) {
       this.data.collectors = this.data.collectors.filter(c => c.id !== id);
       DB.save(this.data);
-      // Sync delete to Google Sheets
+      // Sync delete to Supabase & Google Sheets
+      if (window.SupabaseSync && typeof window.SupabaseSync.deleteCollectorDirect === 'function') {
+        window.SupabaseSync.deleteCollectorDirect(id);
+      }
       if (window.CloudSync && typeof window.CloudSync.deleteCollectorDirect === 'function') {
         window.CloudSync.deleteCollectorDirect(id);
       }
@@ -4879,7 +4911,10 @@ const App = {
 
     DB.save(this.data);
 
-    // Sync direct to Google Sheets
+    // Sync direct to Supabase & Google Sheets
+    if (savedCol && window.SupabaseSync && typeof window.SupabaseSync.saveCollectorDirect === 'function') {
+      window.SupabaseSync.saveCollectorDirect(savedCol);
+    }
     if (savedCol && window.CloudSync && typeof window.CloudSync.saveCollectorDirect === 'function') {
       window.CloudSync.saveCollectorDirect(savedCol);
     }
@@ -6867,6 +6902,9 @@ const App = {
     this.data.masjidTransactions.unshift(newTx);
     DB.save(this.data);
 
+    if (window.SupabaseSync && typeof window.SupabaseSync.saveMasjidTransactionDirect === 'function') {
+      window.SupabaseSync.saveMasjidTransactionDirect(newTx);
+    }
     if (window.CloudSync && window.CloudSync.getGasUrl('masjid')) {
       window.CloudSync.saveMasjidTransactionDirect(newTx);
     }
@@ -6892,6 +6930,10 @@ const App = {
     if (confirm(`Yakin ingin menghapus transaksi ini?\n\n"${tx.uraian}" (${Utils.formatRupiah(tx.nominal)})`)) {
       this.data.masjidTransactions = (this.data.masjidTransactions || []).filter(t => t.id !== id);
       DB.save(this.data);
+
+      if (window.SupabaseSync && typeof window.SupabaseSync.deleteMasjidTransactionDirect === 'function') {
+        window.SupabaseSync.deleteMasjidTransactionDirect(id);
+      }
 
       if (window.CloudSync) {
         if (window.CloudSync.getGasUrl('masjid')) {
@@ -7004,8 +7046,11 @@ const App = {
 
     DB.save(this.data);
 
+    const savedAsset = (this.data.masjidAssets || []).find(a => a.id === (id || newId));
+    if (savedAsset && window.SupabaseSync && typeof window.SupabaseSync.saveMasjidAssetDirect === 'function') {
+      window.SupabaseSync.saveMasjidAssetDirect(savedAsset);
+    }
     if (window.CloudSync && window.CloudSync.getGasUrl('masjid')) {
-      const savedAsset = (this.data.masjidAssets || []).find(a => a.id === (id || newId));
       if (savedAsset) window.CloudSync.saveMasjidAssetDirect(savedAsset);
     }
 
@@ -7022,6 +7067,10 @@ const App = {
     if (confirm(`Yakin ingin menghapus aset "${asset.nama}"?`)) {
       this.data.masjidAssets = (this.data.masjidAssets || []).filter(a => a.id !== id);
       DB.save(this.data);
+
+      if (window.SupabaseSync && typeof window.SupabaseSync.deleteMasjidAssetDirect === 'function') {
+        window.SupabaseSync.deleteMasjidAssetDirect(id);
+      }
 
       if (window.CloudSync) {
         if (window.CloudSync.getGasUrl('masjid')) {
