@@ -3421,6 +3421,22 @@ textarea.form-control {
   }
 }
 
+/* =========================================================================
+   WARGA MASJID TRANSPARENCY WIDGET
+   ========================================================================= */
+.warga-masjid-special-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+@media (max-width: 640px) {
+  .warga-masjid-special-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 
 
 
