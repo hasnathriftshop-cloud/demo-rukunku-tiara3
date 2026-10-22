@@ -11,7 +11,7 @@ const CloudSync = {
   // URL Web App Google Apps Script default lingkungan RT 05 / RW 02 Perum Tiara Candi 3
   DEFAULT_GAS_URL_RT: 'https://script.google.com/macros/s/AKfycbxN-hWB9wZLcKLuUEA2dXX2D23DPrTHPYYkJwmmViq2EdFbwvg0KYEXvAUQFL1FU6JW6w/exec',
   DEFAULT_GAS_URL_MASJID: 'https://script.google.com/macros/s/AKfycbw1GcSR545yTDc-tM71kukD3sa0_hMmbJ87kQ_wnSg9K7irKLffC6NOZKx4Beu33n3G/exec', // Dikosongkan default, diisi pengurus saat deploy Code_Masjid.gs
-
+  
   // Storage Keys Terpisah
   STORAGE_KEY_URL_RT: 'rukunku_gas_url',
   STORAGE_KEY_URL_MASJID: 'rukunku_masjid_gas_url',
@@ -450,6 +450,62 @@ const CloudSync = {
           };
         }
 
+        const isMasjidTxFn = (t) => {
+          if (!t) return false;
+          const id = String(t.id || '').toUpperCase();
+          if (id.startsWith('MSJ-') || id.startsWith('MSJ_')) return true;
+          if (t.kantong && String(t.kantong).trim() !== '') return true;
+          const kat = String(t.kategori || '').toLowerCase();
+          const jud = String(t.judul || t.uraian || '').toLowerCase();
+          const kw = ['kotak amal', 'jariyah', 'infaq', 'infak', 'wakaf', 'marbot', 'muazin', 'masjid', 'zis', 'zakat', 'dkm', 'phbi'];
+          return kw.some(k => kat.includes(k) || jud.includes(k));
+        };
+
+        const rawTxs = Array.isArray(cloudData.transactions) ? cloudData.transactions : (currentLocal.transactions || []);
+        const rtOnlyTxs = [];
+        const extraMasjidTxs = [];
+
+        rawTxs.forEach(t => {
+          if (isMasjidTxFn(t)) {
+            extraMasjidTxs.push(t);
+          } else {
+            rtOnlyTxs.push(t);
+          }
+        });
+
+        if (cleanCategories) {
+          ['masuk', 'keluar'].forEach(catType => {
+            if (Array.isArray(cleanCategories[catType])) {
+              cleanCategories[catType] = cleanCategories[catType].filter(c => {
+                const lower = String(c || '').toLowerCase();
+                return !['kotak amal', 'jariyah', 'infaq', 'infak', 'wakaf', 'marbot', 'muazin', 'masjid', 'zis', 'zakat'].some(kw => lower.includes(kw));
+              });
+            }
+          });
+        }
+
+        const currentMasjidTxs = Array.isArray(currentLocal.masjidTransactions) ? [...currentLocal.masjidTransactions] : [];
+        extraMasjidTxs.forEach(t => {
+          const exists = currentMasjidTxs.some(m => 
+            (m.id && t.id && String(m.id) === String(t.id)) ||
+            (m.tanggal === t.tanggal && Number(m.nominal) === Number(t.nominal) && (m.uraian === t.judul || m.uraian === t.uraian))
+          );
+          if (!exists) {
+            currentMasjidTxs.unshift({
+              id: (t.id && String(t.id).startsWith('MSJ-')) ? t.id : `MSJ-${(t.tanggal || '').replace(/-/g, '')}-${String(Math.floor(Math.random() * 9000) + 1000)}`,
+              tanggal: t.tanggal || new Date().toISOString().slice(0, 10),
+              tipe: t.tipe || 'masuk',
+              kantong: t.kantong || 'Kas Umum',
+              kategori: t.kategori || 'Lainnya',
+              uraian: t.judul || t.uraian || 'Kas Masjid',
+              pihak: t.pihak || (t.tipe === 'keluar' ? 'DKM' : 'Hamba Allah'),
+              nominal: Number(t.nominal) || 0,
+              metode: t.metode || 'Tunai',
+              keterangan: t.keterangan || ''
+            });
+          }
+        });
+
         const cleanCollectors = Array.isArray(cloudData.collectors)
           ? cloudData.collectors.map(c => ({
               ...c,
@@ -464,7 +520,7 @@ const CloudSync = {
           blocks: (cloudData.blocks && Array.isArray(cloudData.blocks) && cloudData.blocks.length > 0) ? cloudData.blocks : currentLocal.blocks,
           categories: cleanCategories,
           residents: residentsToUse,
-          transactions: Array.isArray(cloudData.transactions) ? cloudData.transactions : (currentLocal.transactions || []),
+          transactions: rtOnlyTxs,
           duesMatrix: cloudData.duesMatrix || currentLocal.duesMatrix,
           talangan: Array.isArray(cloudData.talangan) ? cloudData.talangan : (currentLocal.talangan || []),
           collectors: cleanCollectors,
@@ -472,7 +528,7 @@ const CloudSync = {
           // Data masjid selalu dipastikan terjaga utuh dari currentLocal (tidak tertimpa oleh sync RT)
           masjidSettings: currentLocal.masjidSettings || {},
           masjidAdmin: currentLocal.masjidAdmin || {},
-          masjidTransactions: Array.isArray(currentLocal.masjidTransactions) ? currentLocal.masjidTransactions : [],
+          masjidTransactions: currentMasjidTxs,
           masjidAssets: Array.isArray(currentLocal.masjidAssets) ? currentLocal.masjidAssets : []
         };
 
@@ -603,7 +659,7 @@ const CloudSync = {
         blocks: localData.blocks,
         categories: localData.categories,
         residents: localData.residents,
-        transactions: localData.transactions,
+        transactions: (localData.transactions || []).filter(t => !this.isMasjidTx(t)),
         duesMatrix: localData.duesMatrix,
         talangan: localData.talangan,
         collectors: localData.collectors,
@@ -659,7 +715,7 @@ const CloudSync = {
           blocks: localData.blocks,
           categories: localData.categories,
           residents: localData.residents,
-          transactions: localData.transactions,
+          transactions: (localData.transactions || []).filter(t => !this.isMasjidTx(t)),
           duesMatrix: localData.duesMatrix,
           talangan: localData.talangan,
           collectors: localData.collectors,
@@ -888,8 +944,26 @@ const CloudSync = {
     return null;
   },
 
+  // Helper identifikasi transaksi masjid
+  isMasjidTx(t) {
+    if (!t) return false;
+    if (window.App && typeof window.App.isMasjidTx === 'function') {
+      return window.App.isMasjidTx(t);
+    }
+    const id = String(t.id || '').toUpperCase();
+    if (id.startsWith('MSJ-') || id.startsWith('MSJ_')) return true;
+    if (t.kantong && String(t.kantong).trim() !== '') return true;
+    const kat = String(t.kategori || '').toLowerCase();
+    const jud = String(t.judul || t.uraian || '').toLowerCase();
+    const kw = ['kotak amal', 'jariyah', 'infaq', 'infak', 'wakaf', 'marbot', 'muazin', 'masjid', 'zis', 'zakat', 'dkm', 'phbi'];
+    return kw.some(k => kat.includes(k) || jud.includes(k));
+  },
+
   // Tambah transaksi kas masuk / keluar RT langsung ke Google Sheets RT
   async saveTransactionDirect(transaction) {
+    if (this.isMasjidTx(transaction)) {
+      return this.saveMasjidTransactionDirect(transaction);
+    }
     const gasUrl = this.getGasUrl('rt');
     if (!gasUrl || !transaction) return false;
     try {
