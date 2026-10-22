@@ -71,8 +71,96 @@ const Utils = {
 const App = {
   data: null,
 
+  // Helper identifikasi apakah suatu transaksi milik kas masjid
+  isMasjidTx(t) {
+    if (!t) return false;
+    const id = String(t.id || '').toUpperCase();
+    if (id.startsWith('MSJ-') || id.startsWith('MSJ_')) return true;
+    if (t.kantong && String(t.kantong).trim() !== '') return true;
+
+    const kat = String(t.kategori || '').toLowerCase().trim();
+    const jud = String(t.judul || t.uraian || '').toLowerCase().trim();
+
+    const masjidKeywords = [
+      'kotak amal', 'jariyah', 'infaq', 'infak', 'wakaf', 'marbot',
+      'muazin', 'masjid', 'zis', 'zakat', 'dkm', 'mading jumat', 'phbi'
+    ];
+
+    if (masjidKeywords.some(kw => kat.includes(kw))) return true;
+    if (masjidKeywords.some(kw => jud.includes(kw))) return true;
+
+    return false;
+  },
+
+  // Pemisahan otomatis & self-healing jika ada transaksi kas masjid tersimpan di kas RT
+  cleanDataSeparation() {
+    if (!this.data) return false;
+    let changed = false;
+
+    // 1. Bersihkan array transactions agar murni hanya kas RT
+    if (Array.isArray(this.data.transactions)) {
+      const rtTxs = [];
+      if (!Array.isArray(this.data.masjidTransactions)) {
+        this.data.masjidTransactions = [];
+      }
+
+      this.data.transactions.forEach(t => {
+        if (this.isMasjidTx(t)) {
+          changed = true;
+          // Cek apakah sudah ada di masjidTransactions
+          const exists = this.data.masjidTransactions.some(m =>
+            (m.id && t.id && String(m.id) === String(t.id)) ||
+            (m.tanggal === t.tanggal && Number(m.nominal) === Number(t.nominal) && (m.uraian === t.judul || m.uraian === t.uraian))
+          );
+          if (!exists) {
+            this.data.masjidTransactions.unshift({
+              id: (t.id && String(t.id).startsWith('MSJ-')) ? t.id : `MSJ-${(t.tanggal || '').replace(/-/g, '')}-${String(Math.floor(Math.random() * 9000) + 1000)}`,
+              tanggal: t.tanggal || new Date().toISOString().slice(0, 10),
+              tipe: t.tipe || 'masuk',
+              kantong: t.kantong || 'Kas Umum',
+              kategori: t.kategori || 'Lainnya',
+              uraian: t.judul || t.uraian || 'Kas Masjid',
+              pihak: t.pihak || (t.tipe === 'keluar' ? 'DKM' : 'Hamba Allah'),
+              nominal: Number(t.nominal) || 0,
+              metode: t.metode || 'Tunai',
+              keterangan: t.keterangan || ''
+            });
+          }
+        } else {
+          rtTxs.push(t);
+        }
+      });
+
+      if (changed) {
+        this.data.transactions = rtTxs;
+      }
+    }
+
+    // 2. Bersihkan kategori RT jika ada kategori masjid yang terselip
+    if (this.data.categories) {
+      ['masuk', 'keluar'].forEach(type => {
+        if (Array.isArray(this.data.categories[type])) {
+          const origLen = this.data.categories[type].length;
+          this.data.categories[type] = this.data.categories[type].filter(c => {
+            const lower = String(c || '').toLowerCase();
+            return !['kotak amal', 'jariyah', 'infaq', 'infak', 'wakaf', 'marbot', 'muazin', 'masjid', 'zis', 'zakat'].some(kw => lower.includes(kw));
+          });
+          if (this.data.categories[type].length !== origLen) {
+            changed = true;
+          }
+        }
+      });
+    }
+
+    if (changed) {
+      DB.save(this.data);
+    }
+    return changed;
+  },
+
   init() {
     this.data = DB.load();
+    this.cleanDataSeparation();
     this.initSession();
     this.setupEventListeners();
     this.updateSettingsUI();
@@ -84,9 +172,10 @@ const App = {
 
     // Multi-tab / cross-window real-time state synchronization
     window.addEventListener('storage', (e) => {
-      if (e.key === 'rukunku_rt05_data' && e.newValue) {
+      if ((e.key === 'rukunku_rt05_data' || e.key === DB.KEY) && e.newValue) {
         try {
           this.data = JSON.parse(e.newValue);
+          this.cleanDataSeparation();
           if (AppState.currentUser) {
             this.renderDuesMatrix();
             this.renderDashboard();
@@ -1762,7 +1851,7 @@ const App = {
     const curMonth = AppState.selectedMonth || (new Date().getMonth() + 1);
     const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
     const isMasjid = AppState.currentRole === 'admin_masjid';
-    const transactions = isMasjid ? (this.data.masjidTransactions || []) : (this.data.transactions || []);
+    const transactions = isMasjid ? (this.data.masjidTransactions || []) : (this.data.transactions || []).filter(t => !this.isMasjidTx(t));
 
     // Toggle monthly class for horizontal scroll width on mobile
     if (chartCanvas) {
@@ -1931,10 +2020,13 @@ const App = {
   // Dashboard View
   // =========================================================================
   renderDashboard() {
+    this.cleanDataSeparation();
+    const rtOnlyTxs = (this.data.transactions || []).filter(t => !this.isMasjidTx(t));
+
     // Calculate Summary
     let totalMasuk = 0;
     let totalKeluar = 0;
-    this.data.transactions.forEach(t => {
+    rtOnlyTxs.forEach(t => {
       if (t.tipe === 'masuk') totalMasuk += Number(t.nominal);
       else totalKeluar += Number(t.nominal);
     });
@@ -1979,7 +2071,7 @@ const App = {
     const recentTxList = document.getElementById('recentTransactionsList');
     if (recentTxList) {
       recentTxList.innerHTML = '';
-      const recentItems = [...this.data.transactions].slice(0, 5);
+      const recentItems = [...rtOnlyTxs].slice(0, 5);
 
       recentItems.forEach(tx => {
         const row = this.createTransactionRow(tx);
@@ -2884,6 +2976,7 @@ const App = {
   // Buku Kas (Kas Masuk & Keluar)
   // =========================================================================
   renderTransactions() {
+    this.cleanDataSeparation();
     const container = document.getElementById('transactionsTableBody');
     if (!container) return;
 
@@ -2894,7 +2987,8 @@ const App = {
     }
 
     container.innerHTML = '';
-    let filtered = [...this.data.transactions];
+    const rtOnlyTxs = (this.data.transactions || []).filter(t => !this.isMasjidTx(t));
+    let filtered = [...rtOnlyTxs];
 
     const yearFilter = document.getElementById('filterKasYear')?.value;
     if (yearFilter && yearFilter !== 'all') {
@@ -2917,8 +3011,8 @@ const App = {
 
     if (AppState.searchQuery) {
       filtered = filtered.filter(t => 
-        t.judul.toLowerCase().includes(AppState.searchQuery) ||
-        t.kategori.toLowerCase().includes(AppState.searchQuery) ||
+        (t.judul || '').toLowerCase().includes(AppState.searchQuery) ||
+        (t.kategori || '').toLowerCase().includes(AppState.searchQuery) ||
         (t.keterangan && t.keterangan.toLowerCase().includes(AppState.searchQuery)) ||
         (t.blok && t.blok.toLowerCase().includes(AppState.searchQuery))
       );
@@ -2926,7 +3020,7 @@ const App = {
 
     let totalMasuk = 0;
     let totalKeluar = 0;
-    this.data.transactions.forEach(t => {
+    rtOnlyTxs.forEach(t => {
       if (t.tipe === 'masuk') totalMasuk += Number(t.nominal);
       else totalKeluar += Number(t.nominal);
     });
@@ -3018,6 +3112,11 @@ const App = {
       return;
     }
 
+    if (this.isMasjidTx({ kategori, judul })) {
+      alert("⚠️ Transaksi ini terdeteksi sebagai transaksi Kas Masjid (Kotak Amal / Jariyah / Infaq Masjid).\n\nHarap gunakan menu 'Catat Infaq / Donasi' pada Dashboard Kas Masjid agar pembukuan kas lingkungan RT dan kas masjid tetap terpisah rapi.");
+      return;
+    }
+
     const txCount = this.data.transactions.length + 1;
     const newTx = {
       id: `TX-${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(txCount).padStart(3, '0')}`,
@@ -3058,8 +3157,11 @@ const App = {
 
   deleteTransaction(id) {
     if (confirm("Yakin ingin menghapus transaksi ini dari buku kas?")) {
-      this.data.transactions = this.data.transactions.filter(t => t.id !== id);
+      this.data.transactions = (this.data.transactions || []).filter(t => t.id !== id);
       DB.save(this.data);
+      if (window.CloudSync && typeof window.CloudSync.syncNow === 'function') {
+        window.CloudSync.syncNow('rt');
+      }
       this.renderTransactions();
       this.renderDashboard();
     }
@@ -6323,8 +6425,7 @@ const App = {
         const matchU = (t.uraian || '').toLowerCase().includes(searchQuery);
         const matchK = (t.kategori || '').toLowerCase().includes(searchQuery);
         const matchP = (t.pihak || '').toLowerCase().includes(searchQuery);
-        const matchM = (t.metode || '').toLowerCase().includes(searchQuery);
-        if (!matchU && !matchK && !matchP && !matchM) return false;
+        if (!matchU && !matchK && !matchP) return false;
       }
       return true;
     });
@@ -6335,7 +6436,7 @@ const App = {
     if (!tbody) return;
 
     if (filteredTxs.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: #94a3b8; padding: 24px;">Tidak ada transaksi kas masjid pada periode ini.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #94a3b8; padding: 24px;">Tidak ada transaksi kas masjid pada periode ini.</td></tr>`;
       return;
     }
 
@@ -6370,14 +6471,6 @@ const App = {
           <td>${t.pihak || '-'}</td>
           <td style="text-align: right; font-weight: 800; color: ${color}; white-space: nowrap;">
             ${prefix}${Utils.formatRupiah(t.nominal)}
-          </td>
-          <td><span style="font-size: 11px; color: #64748b;">${t.metode || 'Tunai'}</span></td>
-          <td style="text-align: center;">
-            ${isMasuk ? `
-              <button type="button" class="btn-outline-pill" style="font-size: 10.5px; padding: 2px 7px; color: #047857; border-color: #a7f3d0;" onclick="App.printKwitansiMasjid('${t.id}')" title="Lihat Kwitansi Infaq Resmi">
-                🧾 Kwitansi
-              </button>
-            ` : '-'}
           </td>
         </tr>
       `;
