@@ -652,6 +652,9 @@ const DB = {
           data.residents.forEach(r => {
             if (!r.password) r.password = "123456";
             if (typeof r.fotoKk === 'undefined') r.fotoKk = "";
+            if (typeof r.familyMembers === 'string' && r.familyMembers.trim() !== '') {
+              try { r.familyMembers = JSON.parse(r.familyMembers); } catch(e) { r.familyMembers = []; }
+            }
             if (!r.familyMembers || !Array.isArray(r.familyMembers) || r.familyMembers.length === 0) {
               r.familyMembers = [
                 {
