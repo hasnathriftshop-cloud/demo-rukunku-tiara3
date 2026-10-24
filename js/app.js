@@ -201,6 +201,13 @@ const App = {
         this.renderMasjidAset();
         this.renderMasjidLaporan();
         this.switchTab('masjid-dashboard');
+      } else if (AppState.currentRole === 'warga') {
+        this.renderDashboard();
+        this.renderTransactions();
+        this.renderWargaProfile();
+        this.renderWargaIuranHistory();
+        this.renderWargaMasjidTransparansi();
+        this.switchTab(AppState.activeTab || 'dashboard');
       } else {
         this.renderChart();
         this.renderDashboard();
@@ -266,7 +273,7 @@ const App = {
 
   // Initialize Session (Checks sessionStorage first so fresh browser link shows login first)
   initSession() {
-    const saved = sessionStorage.getItem('rukunku_auth_session');
+    const saved = sessionStorage.getItem('rukunku_auth_session') || localStorage.getItem('rukunku_auth_session');
     if (saved) {
       try {
         const user = JSON.parse(saved);
@@ -2845,7 +2852,7 @@ const App = {
     this.openModal('modalTambahWarga');
   },
 
-  saveResidentModal(event) {
+  async saveResidentModal(event) {
     event.preventDefault();
     const id = document.getElementById('residentFormId').value;
     const nama = document.getElementById('wargaNama').value.trim();
@@ -2954,10 +2961,13 @@ const App = {
 
     // Sync direct to Supabase & Google Sheets
     if (savedResident && window.SupabaseSync && typeof window.SupabaseSync.saveResidentDirect === 'function') {
-      window.SupabaseSync.saveResidentDirect(savedResident);
+      await window.SupabaseSync.saveResidentDirect(savedResident);
     }
     if (savedResident && window.CloudSync && typeof window.CloudSync.saveResidentDirect === 'function') {
-      window.CloudSync.saveResidentDirect(savedResident);
+      const isSupa = window.SupabaseSync && typeof window.SupabaseSync.isConfigured === 'function' && window.SupabaseSync.isConfigured();
+      if (!isSupa) {
+        await window.CloudSync.saveResidentDirect(savedResident);
+      }
     }
 
     this.closeModal('modalTambahWarga');
@@ -2989,7 +2999,7 @@ const App = {
     this.openModal('modalTambahWarga');
   },
 
-  deleteResident(id) {
+  async deleteResident(id) {
     const res = this.data.residents.find(r => r.id === id);
     if (!res) return;
 
@@ -3006,10 +3016,13 @@ const App = {
       DB.save(this.data);
       // Sync delete to Supabase & Google Sheets
       if (window.SupabaseSync && typeof window.SupabaseSync.deleteResidentDirect === 'function') {
-        window.SupabaseSync.deleteResidentDirect(id);
+        await window.SupabaseSync.deleteResidentDirect(id);
       }
       if (window.CloudSync && typeof window.CloudSync.deleteResidentDirect === 'function') {
-        window.CloudSync.deleteResidentDirect(id);
+        const isSupa = window.SupabaseSync && typeof window.SupabaseSync.isConfigured === 'function' && window.SupabaseSync.isConfigured();
+        if (!isSupa) {
+          await window.CloudSync.deleteResidentDirect(id);
+        }
       }
       this.renderResidents();
       this.renderDuesMatrix();
@@ -4992,6 +5005,21 @@ const App = {
   // Warga Specific Views (Iuran Rumah Sendiri & Profil Biodata)
   // =========================================================================
   getCurrentResident() {
+    // 0. Re-hydrate session dari storage jika AppState belum terisi di tab/jendela ini
+    if (!AppState.currentUser || !AppState.currentResidentId) {
+      try {
+        const raw = sessionStorage.getItem('rukunku_auth_session') || localStorage.getItem('rukunku_auth_session');
+        if (raw) {
+          const sess = JSON.parse(raw);
+          if (sess && sess.role) {
+            AppState.currentUser = sess;
+            AppState.currentRole = sess.role;
+            if (sess.residentId) AppState.currentResidentId = sess.residentId;
+          }
+        }
+      } catch (e) {}
+    }
+
     const resId = AppState.currentResidentId || AppState.currentUser?.residentId;
     if (resId && Array.isArray(this.data.residents)) {
       const found = this.data.residents.find(r => r.id === resId);
@@ -5013,6 +5041,28 @@ const App = {
         AppState.currentResidentId = byIdent.id;
         return byIdent;
       }
+    }
+    // Jika tidak ditemukan di memory lokal tetapi sesi aktif sebagai warga, daftarkan profilnya agar tidak tertukar!
+    if (AppState.currentUser && AppState.currentRole === 'warga' && AppState.currentUser.residentId) {
+      const cUser = AppState.currentUser;
+      const newRes = {
+        id: cUser.residentId,
+        nama: cUser.name,
+        nik: cUser.username || cUser.nik || '',
+        blok: cUser.blok || '',
+        noRumah: cUser.noRumah || '',
+        alamat: cUser.alamat || '',
+        phone: cUser.phone || '',
+        familyMembers: [],
+        jumlahAnggota: 1,
+        statusHunian: 'Tetap',
+        statusAktif: 'Aktif'
+      };
+      if (!this.data.residents) this.data.residents = [];
+      this.data.residents.push(newRes);
+      DB.save(this.data, { skipSync: true });
+      AppState.currentResidentId = newRes.id;
+      return newRes;
     }
     // Fallback if role is warga: fallback to first resident
     if (AppState.currentRole === 'warga' && Array.isArray(this.data.residents) && this.data.residents.length > 0) {
@@ -5259,39 +5309,52 @@ const App = {
 
       const compressed = await Utils.compressImage(file, 1000, 0.75);
       resident.fotoKk = compressed;
+      if (Array.isArray(this.data.residents)) {
+        const idx = this.data.residents.findIndex(r => r.id === resident.id);
+        if (idx >= 0) this.data.residents[idx] = resident;
+      }
       DB.save(this.data);
       this.renderWargaProfile();
 
-      // Sync direct ke Supabase & Google Sheets
+      // Sync direct ke Supabase Cloud & Google Sheets
       if (window.SupabaseSync && typeof window.SupabaseSync.saveResidentDirect === 'function') {
-        window.SupabaseSync.saveResidentDirect(resident);
+        await window.SupabaseSync.saveResidentDirect(resident);
       }
       if (window.CloudSync && typeof window.CloudSync.saveResidentDirect === 'function') {
-        const success = await window.CloudSync.saveResidentDirect(resident);
-        if (success) {
-          this.renderWargaProfile();
+        const isSupa = window.SupabaseSync && typeof window.SupabaseSync.isConfigured === 'function' && window.SupabaseSync.isConfigured();
+        if (!isSupa) {
+          const success = await window.CloudSync.saveResidentDirect(resident);
+          if (success) this.renderWargaProfile();
         }
       }
-      alert("✅ Foto/Scan Kartu Keluarga (KK) berhasil diunggah!");
+      alert("✅ Foto/Scan Kartu Keluarga (KK) berhasil diunggah ke Database Cloud!");
     } catch (err) {
       alert("Gagal mengunggah foto KK: " + err.message);
     }
   },
 
-  removeKkDocument() {
+  async removeKkDocument() {
     if (!confirm("Hapus foto Kartu Keluarga (KK) yang tersimpan?")) return;
     const resident = this.getCurrentResident();
     if (!resident) return;
     resident.fotoKk = "";
+    if (Array.isArray(this.data.residents)) {
+      const idx = this.data.residents.findIndex(r => r.id === resident.id);
+      if (idx >= 0) this.data.residents[idx] = resident;
+    }
     DB.save(this.data);
+    this.renderWargaProfile();
+
     // Sync direct to Supabase & Google Sheets
     if (window.SupabaseSync && typeof window.SupabaseSync.saveResidentDirect === 'function') {
-      window.SupabaseSync.saveResidentDirect(resident);
+      await window.SupabaseSync.saveResidentDirect(resident);
     }
     if (window.CloudSync && typeof window.CloudSync.saveResidentDirect === 'function') {
-      window.CloudSync.saveResidentDirect(resident);
+      const isSupa = window.SupabaseSync && typeof window.SupabaseSync.isConfigured === 'function' && window.SupabaseSync.isConfigured();
+      if (!isSupa) {
+        await window.CloudSync.saveResidentDirect(resident);
+      }
     }
-    this.renderWargaProfile();
     alert("Foto KK berhasil dihapus.");
   },
 
@@ -5336,7 +5399,11 @@ const App = {
   },
 
   openAddFamilyMemberModal() {
-    this.getCurrentResident();
+    let resident = this.getCurrentResident();
+    if (!resident) {
+      this.initSession();
+      resident = this.getCurrentResident();
+    }
     const form = document.getElementById('formAnggotaKeluarga');
     if (form) form.reset();
     document.getElementById('familyMemberId').value = '';
@@ -5347,7 +5414,11 @@ const App = {
   },
 
   editFamilyMember(memberId) {
-    const resident = this.getCurrentResident();
+    let resident = this.getCurrentResident();
+    if (!resident) {
+      this.initSession();
+      resident = this.getCurrentResident();
+    }
     if (!resident) return;
     const member = (resident.familyMembers || []).find(m => m.id === memberId);
     if (!member) return;
@@ -5378,9 +5449,14 @@ const App = {
 
   async saveFamilyMemberSubmit(event) {
     event.preventDefault();
-    const resident = this.getCurrentResident();
+    let resident = this.getCurrentResident();
     if (!resident) {
-      alert("Sesi warga tidak aktif! Silakan muat ulang halaman.");
+      this.initSession();
+      resident = this.getCurrentResident();
+    }
+    if (!resident) {
+      alert("Sesi warga tidak aktif! Silakan login kembali melalui halaman utama.");
+      this.showAuthScreen();
       return;
     }
 
@@ -5429,26 +5505,42 @@ const App = {
     // Update jumlah anggota otomatis
     resident.jumlahAnggota = Math.max(resident.jumlahAnggota || 1, resident.familyMembers.length);
 
+    // Pastikan referensi resident di dalam this.data.residents ter-update utuh
+    if (Array.isArray(this.data.residents)) {
+      const idx = this.data.residents.findIndex(r => r.id === resident.id);
+      if (idx >= 0) {
+        this.data.residents[idx] = resident;
+      } else {
+        this.data.residents.push(resident);
+      }
+    }
+
     DB.save(this.data);
     this.closeModal('modalAnggotaKeluarga');
     this.renderWargaProfile();
     this.renderResidents();
-    alert("✅ Data anggota keluarga berhasil disimpan!");
 
-    // Sync direct ke Supabase & Google Sheets
+    // 1. Sync direct ke Supabase Cloud (AWAIT agar tersimpan pasti ke cloud PostgreSQL)
     if (window.SupabaseSync && typeof window.SupabaseSync.saveResidentDirect === 'function') {
-      window.SupabaseSync.saveResidentDirect(resident);
+      await window.SupabaseSync.saveResidentDirect(resident);
     }
+
+    // 2. Sync ke Google Sheets hanya jika Supabase belum aktif atau offline
     if (window.CloudSync && typeof window.CloudSync.saveResidentDirect === 'function') {
-      const success = await window.CloudSync.saveResidentDirect(resident);
-      if (success) {
-        this.renderWargaProfile();
-        this.renderResidents();
+      const isSupa = window.SupabaseSync && typeof window.SupabaseSync.isConfigured === 'function' && window.SupabaseSync.isConfigured();
+      if (!isSupa) {
+        const success = await window.CloudSync.saveResidentDirect(resident);
+        if (success) {
+          this.renderWargaProfile();
+          this.renderResidents();
+        }
       }
     }
+
+    alert("✅ Data anggota keluarga berhasil disimpan ke Database Cloud!");
   },
 
-  deleteFamilyMember(memberId) {
+  async deleteFamilyMember(memberId) {
     const resident = this.getCurrentResident();
     if (!resident) return;
     const member = (resident.familyMembers || []).find(m => m.id === memberId);
@@ -5465,16 +5557,28 @@ const App = {
 
     resident.familyMembers = resident.familyMembers.filter(m => m.id !== memberId);
     resident.jumlahAnggota = resident.familyMembers.length;
+
+    if (Array.isArray(this.data.residents)) {
+      const idx = this.data.residents.findIndex(r => r.id === resident.id);
+      if (idx >= 0) {
+        this.data.residents[idx] = resident;
+      }
+    }
+
     DB.save(this.data);
-    // Sync direct ke Supabase & Google Sheets
-    if (window.SupabaseSync && typeof window.SupabaseSync.saveResidentDirect === 'function') {
-      window.SupabaseSync.saveResidentDirect(resident);
-    }
-    if (window.CloudSync && typeof window.CloudSync.saveResidentDirect === 'function') {
-      window.CloudSync.saveResidentDirect(resident);
-    }
     this.renderWargaProfile();
     this.renderResidents();
+
+    // Sync direct ke Supabase & Google Sheets
+    if (window.SupabaseSync && typeof window.SupabaseSync.saveResidentDirect === 'function') {
+      await window.SupabaseSync.saveResidentDirect(resident);
+    }
+    if (window.CloudSync && typeof window.CloudSync.saveResidentDirect === 'function') {
+      const isSupa = window.SupabaseSync && typeof window.SupabaseSync.isConfigured === 'function' && window.SupabaseSync.isConfigured();
+      if (!isSupa) {
+        await window.CloudSync.saveResidentDirect(resident);
+      }
+    }
     alert("Anggota keluarga berhasil dihapus.");
   },
 
