@@ -52,18 +52,21 @@ const CloudSync = {
 
     this.updateStatusUI();
 
-    // Auto-pull update awal dari cloud database sesuai scope aktif saat startup
+    // Auto-pull update awal dari cloud database sesuai scope aktif saat startup (hanya jika Supabase tidak aktif)
+    const isSupabaseReady = window.SupabaseSync && typeof window.SupabaseSync.isConfigured === 'function' && window.SupabaseSync.isConfigured();
     const activeScope = this.getActiveScope();
-    if (this.getGasUrl(activeScope)) {
+    if (!isSupabaseReady && this.getGasUrl(activeScope)) {
       this.pullFromSheets({ silent: true }, activeScope);
     }
     // Jika scope bukan masjid (misal warga) dan database masjid terkonfigurasi, tarik juga data kas masjid untuk transparansi warga
-    if (activeScope !== 'masjid' && this.getGasUrl('masjid')) {
+    if (!isSupabaseReady && activeScope !== 'masjid' && this.getGasUrl('masjid')) {
       this.pullFromSheets({ silent: true }, 'masjid');
     }
 
-    // Auto-refresh data saat user kembali membuka tab browser RukunKu
+    // Auto-refresh data saat user kembali membuka tab browser RukunKu (lewati jika Supabase aktif)
     window.addEventListener('focus', () => {
+      const isSupa = window.SupabaseSync && typeof window.SupabaseSync.isConfigured === 'function' && window.SupabaseSync.isConfigured();
+      if (isSupa) return;
       const sc = this.getActiveScope();
       if (this.getGasUrl(sc) && Date.now() - (this.lastPullTimestamp[sc] || 0) > 5000 && this.status[sc] !== 'syncing') {
         this.pullFromSheets({ silent: true }, sc);
@@ -71,6 +74,8 @@ const CloudSync = {
     });
 
     document.addEventListener('visibilitychange', () => {
+      const isSupa = window.SupabaseSync && typeof window.SupabaseSync.isConfigured === 'function' && window.SupabaseSync.isConfigured();
+      if (isSupa) return;
       if (document.visibilityState === 'visible') {
         const sc = this.getActiveScope();
         if (this.getGasUrl(sc) && Date.now() - (this.lastPullTimestamp[sc] || 0) > 5000 && this.status[sc] !== 'syncing') {
@@ -79,8 +84,10 @@ const CloudSync = {
       }
     });
 
-    // Smart Background Polling: cek data baru dari Google Sheets setiap 25 detik saat tab aktif
+    // Smart Background Polling: cek data baru dari Google Sheets setiap 25 detik saat tab aktif (lewati jika Supabase aktif)
     setInterval(() => {
+      const isSupa = window.SupabaseSync && typeof window.SupabaseSync.isConfigured === 'function' && window.SupabaseSync.isConfigured();
+      if (isSupa) return;
       if (document.visibilityState === 'visible') {
         const sc = this.getActiveScope();
         if (this.getGasUrl(sc) && this.status[sc] !== 'syncing' && Date.now() - (this.lastPullTimestamp[sc] || 0) > 20000) {
@@ -403,6 +410,12 @@ const CloudSync = {
 
   // Pull Data from Google Sheets (GET action=getData) sesuai Scope
   async pullFromSheets(options = {}, scope = null) {
+    const isSupabaseReady = window.SupabaseSync && typeof window.SupabaseSync.isConfigured === 'function' && window.SupabaseSync.isConfigured();
+    // PENGAMAN: Jika Supabase aktif dan penarikan bersifat otomatis/silent di latar belakang, lewati penarikan Google Sheets agar data Supabase tidak tertimpa!
+    if (isSupabaseReady && options.silent) {
+      return false;
+    }
+
     const targetScope = scope || this.getActiveScope();
     const gasUrl = this.getGasUrl(targetScope);
     if (!gasUrl) return false;
@@ -811,6 +824,11 @@ const CloudSync = {
 
   // Tambah / Update data warga langsung ke Google Sheets RT (sheet Warga)
   async saveResidentDirect(resident) {
+    const isSupabaseReady = window.SupabaseSync && typeof window.SupabaseSync.isConfigured === 'function' && window.SupabaseSync.isConfigured();
+    if (isSupabaseReady && window.SupabaseSync && typeof window.SupabaseSync.saveResidentDirect === 'function') {
+      return await window.SupabaseSync.saveResidentDirect(resident);
+    }
+
     const gasUrl = this.getGasUrl('rt');
     if (!gasUrl || !resident) return false;
     try {
@@ -833,9 +851,15 @@ const CloudSync = {
               Number(json.resident.jumlahAnggota) || 1,
               (json.resident.familyMembers ? json.resident.familyMembers.length : 1)
             );
+            const currentFamily = currentLocal.residents[rIdx].familyMembers || [];
+            const returnedFamily = (Array.isArray(json.resident.familyMembers) && json.resident.familyMembers.length > 0)
+              ? json.resident.familyMembers
+              : currentFamily;
+
             currentLocal.residents[rIdx] = {
               ...currentLocal.residents[rIdx],
               ...json.resident,
+              familyMembers: returnedFamily,
               jumlahAnggota: preservedJumlah
             };
             DB.save(currentLocal, { skipSync: true });
