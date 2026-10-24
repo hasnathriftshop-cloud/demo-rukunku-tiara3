@@ -726,25 +726,46 @@ const SupabaseSync = {
       // 4. Residents
       let mergedResidents = currentLocal.residents || [];
       if (Array.isArray(resResidents) && resResidents.length > 0) {
-        mergedResidents = resResidents.map(r => ({
-          id: r.id,
-          nama: r.nama,
-          nik: r.nik || '',
-          noKk: r.no_kk || '',
-          blok: r.blok || '',
-          noRumah: r.no_rumah || '',
-          alamat: r.alamat || '',
-          phone: r.phone || '',
-          jumlahAnggota: r.jumlah_anggota || 1,
-          statusHunian: r.status_hunian || 'Tetap',
-          pekerjaan: r.pekerjaan || '',
-          statusAktif: r.status_aktif || 'Aktif',
-          tanggalMasuk: r.tanggal_masuk || '',
-          avatarBg: r.avatar_bg || '#0d9488',
-          password: r.password || '123456',
-          familyMembers: Array.isArray(r.family_members) ? r.family_members : [],
-          fotoKk: r.foto_kk || ''
-        }));
+        mergedResidents = resResidents.map(r => {
+          let rawFm = r.family_members;
+          let parsedFm = [];
+          if (Array.isArray(rawFm)) {
+            parsedFm = rawFm;
+          } else if (typeof rawFm === 'string' && rawFm.trim() !== '') {
+            try { parsedFm = JSON.parse(rawFm); } catch(e) { parsedFm = []; }
+          }
+
+          // PERLINDUNGAN: Jangan timpa anggota keluarga lokal jika remote kosong tapi lokal sudah ada
+          const localRes = (currentLocal.residents || []).find(x => x.id === r.id);
+          const localFm = (localRes && Array.isArray(localRes.familyMembers)) ? localRes.familyMembers : [];
+          const finalFm = (parsedFm && parsedFm.length > 0) ? parsedFm : localFm;
+
+          const safeJumlah = Math.max(
+            Number(r.jumlah_anggota) || 1,
+            Number(localRes?.jumlahAnggota) || 1,
+            finalFm.length || 1
+          );
+
+          return {
+            id: r.id,
+            nama: r.nama,
+            nik: r.nik || '',
+            noKk: r.no_kk || '',
+            blok: r.blok || '',
+            noRumah: r.no_rumah || '',
+            alamat: r.alamat || '',
+            phone: r.phone || '',
+            jumlahAnggota: safeJumlah,
+            statusHunian: r.status_hunian || 'Tetap',
+            pekerjaan: r.pekerjaan || '',
+            statusAktif: r.status_aktif || 'Aktif',
+            tanggalMasuk: r.tanggal_masuk || '',
+            avatarBg: r.avatar_bg || '#0d9488',
+            password: r.password || (localRes?.password || '123456'),
+            familyMembers: finalFm,
+            fotoKk: r.foto_kk || (localRes?.fotoKk || '')
+          };
+        });
       }
 
       // 5. Dues Matrix (Mendukung format per-tahun dan flat untuk kompatibilitas penuh)
@@ -957,6 +978,8 @@ const SupabaseSync = {
           if (typeof window.App.renderSetoranBlok === 'function') window.App.renderSetoranBlok();
           if (typeof window.App.renderTalangan === 'function') window.App.renderTalangan();
           if (typeof window.App.renderKelolaPetugasPage === 'function') window.App.renderKelolaPetugasPage();
+          if (typeof window.App.renderWargaProfile === 'function') window.App.renderWargaProfile();
+          if (typeof window.App.renderWargaIuranHistory === 'function') window.App.renderWargaIuranHistory();
           if (typeof window.App.renderMasjidDashboard === 'function') window.App.renderMasjidDashboard();
           if (typeof window.App.renderMasjidKas === 'function') window.App.renderMasjidKas();
           if (typeof window.App.renderMasjidAset === 'function') window.App.renderMasjidAset();
@@ -1045,6 +1068,13 @@ const SupabaseSync = {
       const rows = await res.json();
       if (Array.isArray(rows) && rows.length > 0) {
         const r = rows[0];
+        let rawFm = r.family_members;
+        let parsedFm = [];
+        if (Array.isArray(rawFm)) {
+          parsedFm = rawFm;
+        } else if (typeof rawFm === 'string' && rawFm.trim() !== '') {
+          try { parsedFm = JSON.parse(rawFm); } catch(e) { parsedFm = []; }
+        }
         return {
           id: r.id,
           nama: r.nama,
@@ -1054,14 +1084,14 @@ const SupabaseSync = {
           noRumah: r.no_rumah || '',
           alamat: r.alamat || '',
           phone: r.phone || '',
-          jumlahAnggota: r.jumlah_anggota || 1,
+          jumlahAnggota: Math.max(Number(r.jumlah_anggota) || 1, parsedFm.length || 1),
           statusHunian: r.status_hunian || 'Tetap',
           pekerjaan: r.pekerjaan || '',
           statusAktif: r.status_aktif || 'Aktif',
           tanggalMasuk: r.tanggal_masuk || '',
           avatarBg: r.avatar_bg || '#0d9488',
           password: r.password || '123456',
-          familyMembers: Array.isArray(r.family_members) ? r.family_members : [],
+          familyMembers: parsedFm,
           fotoKk: r.foto_kk || ''
         };
       }
@@ -1075,32 +1105,50 @@ const SupabaseSync = {
   // REALTIME DIRECT PUSH CRUD METHODS
   // =========================================================================
   async saveResidentDirect(r) {
-    if (!r) return;
+    if (!r || !r.id) return false;
     try {
-      await fetch(this.getRestUrl('rt_residents'), {
+      const payload = {
+        id: r.id,
+        nama: r.nama || '',
+        nik: r.nik ? String(r.nik).replace(/^'/, '').trim() : '',
+        no_kk: r.noKk ? String(r.noKk).replace(/^'/, '').trim() : '',
+        blok: r.blok || '',
+        no_rumah: r.noRumah || '',
+        alamat: r.alamat || '',
+        phone: r.phone ? String(r.phone).replace(/^'/, '').trim() : '',
+        jumlah_anggota: Number(r.jumlahAnggota) || (Array.isArray(r.familyMembers) ? r.familyMembers.length : 1),
+        status_hunian: r.statusHunian || 'Tetap',
+        pekerjaan: r.pekerjaan || '',
+        status_aktif: String(r.statusAktif || 'Aktif'),
+        avatar_bg: r.avatarBg || '#0d9488',
+        password: r.password || '123456',
+        family_members: Array.isArray(r.familyMembers) ? r.familyMembers : [],
+        foto_kk: r.fotoKk || ''
+      };
+
+      // 1. Coba simpan menggunakan POST upsert (on_conflict=id)
+      const res = await fetch(this.getRestUrl('rt_residents?on_conflict=id'), {
         method: 'POST',
         headers: this.getHeaders(true),
-        body: JSON.stringify({
-          id: r.id,
-          nama: r.nama,
-          nik: r.nik || '',
-          no_kk: r.noKk || '',
-          blok: r.blok || '',
-          no_rumah: r.noRumah || '',
-          alamat: r.alamat || '',
-          phone: r.phone ? String(r.phone).replace(/^'/, '') : '',
-          jumlah_anggota: Number(r.jumlahAnggota) || (r.familyMembers ? r.familyMembers.length : 1),
-          status_hunian: r.statusHunian || 'Tetap',
-          pekerjaan: r.pekerjaan || '',
-          status_aktif: r.statusAktif || 'Aktif',
-          avatar_bg: r.avatarBg || '#0d9488',
-          password: r.password || '123456',
-          family_members: r.familyMembers || [],
-          foto_kk: r.fotoKk || ''
-        })
+        body: JSON.stringify(payload)
       });
+
+      if (!res.ok) {
+        // 2. Fallback jika upsert conflict: lakukan PATCH langsung pada baris id tersebut
+        const patchRes = await fetch(this.getRestUrl(`rt_residents?id=eq.${encodeURIComponent(r.id)}`), {
+          method: 'PATCH',
+          headers: this.getHeaders(),
+          body: JSON.stringify(payload)
+        });
+        if (!patchRes.ok) {
+          console.warn("Supabase saveResidentDirect fallback PATCH failed:", patchRes.status);
+          return false;
+        }
+      }
+      return true;
     } catch (e) {
       console.warn("Supabase saveResidentDirect error:", e);
+      return false;
     }
   },
 
