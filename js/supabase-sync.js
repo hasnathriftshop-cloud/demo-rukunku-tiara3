@@ -450,7 +450,7 @@ const SupabaseSync = {
         const finalDuesRows = Array.from(uniqueDuesMap.values());
 
         if (finalDuesRows.length > 0) {
-          await fetch(this.getRestUrl('rt_dues'), {
+          await fetch(this.getRestUrl('rt_dues?on_conflict=resident_id,tahun'), {
             method: 'POST',
             headers: this.getHeaders(true),
             body: JSON.stringify(finalDuesRows)
@@ -483,7 +483,7 @@ const SupabaseSync = {
         }));
 
         if (txRows.length > 0) {
-          await fetch(this.getRestUrl('rt_transactions'), {
+          await fetch(this.getRestUrl('rt_transactions?on_conflict=id'), {
             method: 'POST',
             headers: this.getHeaders(true),
             body: JSON.stringify(txRows)
@@ -1171,30 +1171,40 @@ const SupabaseSync = {
       return this.saveMasjidTransactionDirect(t);
     }
 
+    const payload = {
+      id: t.id,
+      tanggal: t.tanggal || new Date().toISOString().slice(0, 10),
+      waktu: t.waktu || '10:00',
+      tipe: t.tipe || 'masuk',
+      kategori: t.kategori || 'Iuran Bulanan',
+      judul: t.judul || '',
+      keterangan: t.keterangan || '',
+      resident_id: t.residentId || null,
+      blok: t.blok || '',
+      nominal: Number(t.nominal) || 0,
+      metode: t.metode || 'Kas Tunai',
+      status: t.status || 'Approved',
+      kwitansi: t.kwitansi || '',
+      pencatat: t.pencatat || '',
+      bukti_transfer: t.buktiTransfer || '',
+      periode_tahun: t.periodeTahun || null,
+      periode_bulan: t.periodeBulan || null
+    };
+
     try {
-      await fetch(this.getRestUrl('rt_transactions'), {
+      const res = await fetch(this.getRestUrl('rt_transactions?on_conflict=id'), {
         method: 'POST',
         headers: this.getHeaders(true),
-        body: JSON.stringify({
-          id: t.id,
-          tanggal: t.tanggal || new Date().toISOString().slice(0, 10),
-          waktu: t.waktu || '10:00',
-          tipe: t.tipe || 'masuk',
-          kategori: t.kategori || 'Iuran Bulanan',
-          judul: t.judul || '',
-          keterangan: t.keterangan || '',
-          resident_id: t.residentId || null,
-          blok: t.blok || '',
-          nominal: Number(t.nominal) || 0,
-          metode: t.metode || 'Kas Tunai',
-          status: t.status || 'Approved',
-          kwitansi: t.kwitansi || '',
-          pencatat: t.pencatat || '',
-          bukti_transfer: t.buktiTransfer || '',
-          periode_tahun: t.periodeTahun || null,
-          periode_bulan: t.periodeBulan || null
-        })
+        body: JSON.stringify(payload)
       });
+      if (!res.ok) {
+        // Fallback PATCH jika sudah ada
+        await fetch(this.getRestUrl(`rt_transactions?id=eq.${encodeURIComponent(t.id)}`), {
+          method: 'PATCH',
+          headers: this.getHeaders(),
+          body: JSON.stringify(payload)
+        });
+      }
     } catch (e) {
       console.warn("Supabase saveTransactionDirect error:", e);
     }
@@ -1215,16 +1225,27 @@ const SupabaseSync = {
   async updateDuesDirect(residentId, year, month, status) {
     if (!residentId || !year || !month) return;
     const colName = `m${month}`;
+    const yr = parseInt(year) || new Date().getFullYear();
     try {
-      await fetch(this.getRestUrl('rt_dues'), {
+      const res = await fetch(this.getRestUrl('rt_dues?on_conflict=resident_id,tahun'), {
         method: 'POST',
         headers: this.getHeaders(true),
         body: JSON.stringify({
           resident_id: residentId,
-          tahun: parseInt(year),
+          tahun: yr,
           [colName]: status
         })
       });
+      if (!res.ok) {
+        // Fallback PATCH langsung untuk update spesifik
+        await fetch(this.getRestUrl(`rt_dues?resident_id=eq.${encodeURIComponent(residentId)}&tahun=eq.${yr}`), {
+          method: 'PATCH',
+          headers: this.getHeaders(),
+          body: JSON.stringify({
+            [colName]: status
+          })
+        });
+      }
     } catch (e) {
       console.warn("Supabase updateDuesDirect error:", e);
     }
