@@ -11,161 +11,160 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
   <!-- Custom Modern Stylesheet -->
-  <link rel="stylesheet" href="css/style.css?v=20261022_05">
+  <link rel="stylesheet" href="css/style.css?v=20261030_01">
 </head>
 <body>
 
   <!-- ========================================================================
-       HALAMAN UTAMA: LOGIN & DAFTAR AKUN WARGA (Fixing Point 1 & 2)
-       Tampil pertama kali saat membuka webapp RukunKu
+       HALAMAN UTAMA: GOOGLE-STYLE AUTHENTICATION (MASUK & BUAT AKUN)
+       Desain bersih, modern, dan minimalis tanpa pilihan role manual
        ======================================================================== -->
   <div id="screenAuth" class="auth-screen-container">
     <div class="auth-screen-card">
       
-      <!-- Brand Header -->
-      <div class="auth-brand-header">
-        <div class="auth-brand-logo-icon">
-          <svg width="28" height="28" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.3" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
-          </svg>
-        </div>
-        <h1 class="auth-brand-title">RukunKu</h1>
-        <div class="auth-brand-desc">Sistem Manajemen Warga & Keuangan Lingkungan RT Terpadu</div>
-        <div class="auth-rt-pill">
-          <span class="display-rt-name">RT 05 / RW 02</span> <span class="display-perumahan">Perum Tiara Candi 3</span>
+      <!-- Brand Header (Google Style) -->
+      <div class="google-auth-header">
+        <div class="google-brand-row">
+          <div class="google-logo-badge">
+            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.3" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+            </svg>
+          </div>
+          <div class="google-rt-pill">
+            <span class="display-rt-name">RT 05 / RW 02</span> • <span class="display-perumahan">Perum Tiara Candi 3</span>
+          </div>
         </div>
       </div>
 
-      <!-- Tab Navigasi: Masuk vs Daftar Warga -->
-      <div class="auth-tabs">
-        <button type="button" class="auth-tab-btn active" data-auth-tab="login" onclick="App.switchAuthTab('login')">
-          Masuk (Login)
-        </button>
-        <button type="button" class="auth-tab-btn" data-auth-tab="register" onclick="App.switchAuthTab('register')">
-          Daftar Akun Warga
-        </button>
-      </div>
-
-      <!-- 1. TAB LOGIN -->
+      <!-- 1. GOOGLE SIGN-IN VIEW -->
       <div id="authLoginSection">
-        <p style="font-size: 12.5px; color: #64748b; margin-bottom: 14px;">
-          Pilih peran akun Anda untuk masuk ke sistem lingkungan:
-        </p>
-
-        <!-- Pilihan Role Akun (Pengurus RT, Admin Masjid, dan Warga) -->
-        <div class="auth-role-grid" style="grid-template-columns: repeat(3, 1fr); gap: 8px;">
-          <div class="auth-role-card selected" data-role="pengurus" onclick="App.selectAuthRole('pengurus')">
-            <span class="auth-role-icon">🛡️</span>
-            <span class="auth-role-title">Pengurus RT</span>
-            <span class="auth-role-desc">Ketua & Bendahara RT</span>
-          </div>
-          <div class="auth-role-card" data-role="admin_masjid" onclick="App.selectAuthRole('admin_masjid')">
-            <span class="auth-role-icon">🕌</span>
-            <span class="auth-role-title">Admin Masjid</span>
-            <span class="auth-role-desc">DKM Masjid Sabilillah</span>
-          </div>
-          <div class="auth-role-card" data-role="warga" onclick="App.selectAuthRole('warga')">
-            <span class="auth-role-icon">👨‍👩‍👧‍👦</span>
-            <span class="auth-role-title">Warga RT</span>
-            <span class="auth-role-desc">Iuran & Portal Warga</span>
-          </div>
+        <div style="margin-bottom: 24px;">
+          <h1 class="google-auth-title">Masuk</h1>
+          <p class="google-auth-subtitle">Gunakan Akun RukunKu Anda</p>
         </div>
 
         <form onsubmit="App.loginSubmit(event)">
-          <div class="form-group">
-            <label class="form-label" id="authUsernameLabel">Username Pengurus *</label>
-            <input type="text" id="authUsername" class="form-control" placeholder="Contoh: admin atau nama pengurus" value="" required autocomplete="off">
+          <div class="google-field-group">
+            <label class="google-field-label" id="authUsernameLabel" for="authUsername">Nomor WhatsApp, NIK, atau Username</label>
+            <div class="google-input-wrapper">
+              <input type="text" id="authUsername" class="google-input" placeholder="No. WA, NIK, atau Username" required autocomplete="username">
+            </div>
             <span id="authUsernameHint" style="display: none;"></span>
           </div>
 
-          <div class="form-group" style="margin-top: 10px;">
-            <label class="form-label" id="authPasswordLabel">Password Akun *</label>
-            <div style="position: relative; display: flex; align-items: center;">
-              <input type="password" id="authPassword" class="form-control" placeholder="Password akun" value="" required style="padding-right: 42px;" autocomplete="new-password">
-              <button type="button" class="btn-eye-toggle" onclick="App.toggleInputPassword('authPassword', this)" title="Lihat/Sembunyikan Password">👁️</button>
+          <div class="google-field-group">
+            <label class="google-field-label" id="authPasswordLabel" for="authPassword">Password</label>
+            <div class="google-input-wrapper">
+              <input type="password" id="authPassword" class="google-input" placeholder="Masukkan password Anda" required autocomplete="current-password">
+              <button type="button" class="google-eye-btn" onclick="App.toggleInputPassword('authPassword', this)" title="Lihat/Sembunyikan Password">👁️</button>
             </div>
           </div>
 
-          <div style="margin-top: 20px;">
-            <button type="submit" class="btn-teal-pill" style="width: 100%; justify-content: center; padding: 13px; font-size: 14px;">
-              Masuk ke Sistem
-            </button>
+          <!-- Bantuan Akses Cepat Demo (Minimalis) -->
+          <div class="google-quick-demo">
+            <span class="google-quick-demo-title">Akses Cepat Akun Demo:</span>
+            <div class="google-demo-chips">
+              <button type="button" class="google-chip" onclick="App.fillDemoLogin('pengurus')">🛡️ Pengurus RT</button>
+              <button type="button" class="google-chip" onclick="App.fillDemoLogin('admin_masjid')">🕌 Admin Masjid</button>
+              <button type="button" class="google-chip" onclick="App.fillDemoLogin('warga')">👨‍👩‍👧‍👦 Warga RT</button>
+            </div>
+          </div>
+
+          <!-- Footer Actions (Google Style: Buat Akun di Kiri, Masuk di Kanan) -->
+          <div class="google-auth-actions">
+            <button type="button" class="google-link-btn" onclick="App.switchAuthTab('register')">Buat akun</button>
+            <button type="submit" class="google-submit-btn">Masuk</button>
           </div>
         </form>
       </div>
 
-      <!-- 2. TAB DAFTAR AKUN WARGA BARU (Simplified) -->
+      <!-- 2. GOOGLE CREATE ACCOUNT VIEW (Daftar Akun Warga) -->
       <div id="authRegisterSection" style="display: none;">
-        <div style="background: #f0fdfa; border: 1px solid #ccfbf1; border-radius: 12px; padding: 12px; margin-bottom: 14px; font-size: 12px; color: #0f766e; line-height: 1.5;">
-          <strong>💡 Pendaftaran Cepat & Simpel:</strong> Cukup daftarkan identitas kepala keluarga di bawah. Anggota keluarga yang tinggal bersama serta dokumen KK & KTP dapat ditambahkan langsung setelah masuk ke dashboard warga.
+        <div style="margin-bottom: 22px;">
+          <h2 class="google-auth-title">Buat Akun RukunKu</h2>
+          <p class="google-auth-subtitle">Daftarkan identitas kepala keluarga untuk akses warga RT</p>
         </div>
 
         <form onsubmit="App.registerWargaSubmit(event)">
-          <div class="form-group">
-            <label class="form-label">Nama Lengkap Kepala Keluarga (KK) *</label>
-            <input type="text" id="regNama" class="form-control" placeholder="Contoh: Bpk. Hendra Pratama" required>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">Nomor WhatsApp Aktif *</label>
-              <input type="text" id="regPhone" class="form-control" placeholder="Contoh: 081234567890" required>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Status Hunian</label>
-              <select id="regStatusHunian" class="form-control">
-                <option value="Pemilik Tetap">Pemilik Tetap</option>
-                <option value="Kontrak">Kontrak / Sewa</option>
-                <option value="Kos">Kos</option>
-              </select>
+          <div class="google-field-group">
+            <label class="google-field-label">Nama Lengkap Kepala Keluarga (KK) *</label>
+            <div class="google-input-wrapper">
+              <input type="text" id="regNama" class="google-input" placeholder="Contoh: Bpk. Hendra Pratama" required>
             </div>
           </div>
 
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">Pilihan Blok Rumah *</label>
-              <select id="regWargaBlok" class="form-control" required>
-                <!-- Dynamically populated -->
-              </select>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Nomor Rumah *</label>
-              <input type="text" id="regNoRumah" class="form-control" placeholder="Contoh: 12A" required>
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">Nomor Induk Kependudukan (NIK) KK *</label>
-              <input type="text" id="regNik" class="form-control" placeholder="16 digit NIK Kepala Keluarga" required>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Nomor Kartu Keluarga (No KK)</label>
-              <input type="text" id="regNoKk" class="form-control" placeholder="16 digit No KK (opsional)">
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">Buat Password Akun *</label>
-              <div style="position: relative; display: flex; align-items: center;">
-                <input type="password" id="regPassword" class="form-control" placeholder="Minimal 6 karakter" required style="padding-right: 42px;">
-                <button type="button" class="btn-eye-toggle" onclick="App.toggleInputPassword('regPassword', this)" title="Lihat/Sembunyikan Password">👁️</button>
+          <div class="google-field-row">
+            <div class="google-field-group" style="flex: 1;">
+              <label class="google-field-label">Nomor WhatsApp Aktif *</label>
+              <div class="google-input-wrapper">
+                <input type="text" id="regPhone" class="google-input" placeholder="081234567890" required>
               </div>
             </div>
-            <div class="form-group">
-              <label class="form-label">Ulangi Password *</label>
-              <div style="position: relative; display: flex; align-items: center;">
-                <input type="password" id="regPasswordConfirm" class="form-control" placeholder="Ulangi password" required style="padding-right: 42px;">
-                <button type="button" class="btn-eye-toggle" onclick="App.toggleInputPassword('regPasswordConfirm', this)" title="Lihat/Sembunyikan Password">👁️</button>
+            <div class="google-field-group" style="flex: 1;">
+              <label class="google-field-label">Status Hunian</label>
+              <div class="google-input-wrapper">
+                <select id="regStatusHunian" class="google-input">
+                  <option value="Pemilik Tetap">Pemilik Tetap</option>
+                  <option value="Kontrak">Kontrak / Sewa</option>
+                  <option value="Kos">Kos</option>
+                </select>
               </div>
             </div>
           </div>
 
-          <div style="margin-top: 18px;">
-            <button type="submit" class="btn-teal-pill" style="width: 100%; justify-content: center; padding: 13px; font-size: 14px;">
-              Daftar & Masuk ke Dashboard Warga
-            </button>
+          <div class="google-field-row">
+            <div class="google-field-group" style="flex: 1;">
+              <label class="google-field-label">Pilihan Blok Rumah *</label>
+              <div class="google-input-wrapper">
+                <select id="regWargaBlok" class="google-input" required>
+                  <!-- Dynamically populated -->
+                </select>
+              </div>
+            </div>
+            <div class="google-field-group" style="flex: 1;">
+              <label class="google-field-label">Nomor Rumah *</label>
+              <div class="google-input-wrapper">
+                <input type="text" id="regNoRumah" class="google-input" placeholder="Contoh: 12A" required>
+              </div>
+            </div>
+          </div>
+
+          <div class="google-field-row">
+            <div class="google-field-group" style="flex: 1;">
+              <label class="google-field-label">NIK Kepala Keluarga (16 Digit) *</label>
+              <div class="google-input-wrapper">
+                <input type="text" id="regNik" class="google-input" placeholder="16 digit NIK" required maxlength="16">
+              </div>
+            </div>
+            <div class="google-field-group" style="flex: 1;">
+              <label class="google-field-label">No. Kartu Keluarga (Opsional)</label>
+              <div class="google-input-wrapper">
+                <input type="text" id="regNoKk" class="google-input" placeholder="16 digit No KK">
+              </div>
+            </div>
+          </div>
+
+          <div class="google-field-row">
+            <div class="google-field-group" style="flex: 1;">
+              <label class="google-field-label">Buat Password *</label>
+              <div class="google-input-wrapper">
+                <input type="password" id="regPassword" class="google-input" placeholder="Min. 6 karakter" required autocomplete="new-password">
+                <button type="button" class="google-eye-btn" onclick="App.toggleInputPassword('regPassword', this)" title="Lihat/Sembunyikan Password">👁️</button>
+              </div>
+            </div>
+            <div class="google-field-group" style="flex: 1;">
+              <label class="google-field-label">Ulangi Password *</label>
+              <div class="google-input-wrapper">
+                <input type="password" id="regPasswordConfirm" class="google-input" placeholder="Ulangi password" required autocomplete="new-password">
+                <button type="button" class="google-eye-btn" onclick="App.toggleInputPassword('regPasswordConfirm', this)" title="Lihat/Sembunyikan Password">👁️</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Footer Actions (Google Style: Masuk di Kiri, Daftar di Kanan) -->
+          <div class="google-auth-actions">
+            <button type="button" class="google-link-btn" onclick="App.switchAuthTab('login')">Sudah punya akun? Masuk</button>
+            <button type="submit" class="google-submit-btn">Daftar Akun</button>
           </div>
         </form>
       </div>
@@ -3224,11 +3223,11 @@
   <!-- Supabase Official JS SDK via CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- Scripts with cache-busting -->
-  <script src="js/data.js?v=20261023_01"></script>
-  <script src="js/supabase-sync.js?v=20261023_01"></script>
-  <script src="js/cloud-sync.js?v=20261023_01"></script>
-  <script src="js/report-pdf.js?v=20261023_01"></script>
-  <script src="js/app.js?v=20261023_01"></script>
+  <script src="js/data.js?v=20261030_01"></script>
+  <script src="js/supabase-sync.js?v=20261030_01"></script>
+  <script src="js/cloud-sync.js?v=20261030_01"></script>
+  <script src="js/report-pdf.js?v=20261030_01"></script>
+  <script src="js/app.js?v=20261030_01"></script>
 
   <script>
     // Set default date picker values to today (bulletproof ready check)
