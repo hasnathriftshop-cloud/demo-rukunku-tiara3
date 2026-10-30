@@ -458,28 +458,59 @@ const App = {
   // =========================================================================
   getDuesStatus(resId, year, month) {
     const yStr = String(year || AppState.selectedYear || new Date().getFullYear());
+    const yNum = parseInt(yStr);
     const mNum = Number(month);
     const mStr = String(month);
     const matrix = this.data?.duesMatrix || {};
 
+    let status = 'Belum';
+
     // 1. Cek struktur multi-tahun: matrix[tahun][residentId][bulan]
     if (matrix[yStr] && matrix[yStr][resId]) {
       const rm = matrix[yStr][resId];
-      if (rm[mNum] !== undefined) return rm[mNum];
-      if (rm[mStr] !== undefined) return rm[mStr];
-      return 'Belum';
-    }
-
-    // 2. Cek fallback flat structure lama (khusus data existing 2026)
-    if (yStr === '2026' && matrix[resId]) {
+      if (rm[mNum] !== undefined) status = rm[mNum];
+      else if (rm[mStr] !== undefined) status = rm[mStr];
+    } else if (yStr === '2026' && matrix[resId]) {
+      // 2. Cek fallback flat structure lama (khusus data existing 2026)
       const rm = matrix[resId];
-      if (rm[mNum] !== undefined) return rm[mNum];
-      if (rm[mStr] !== undefined) return rm[mStr];
-      return 'Belum';
+      if (rm[mNum] !== undefined) status = rm[mNum];
+      else if (rm[mStr] !== undefined) status = rm[mStr];
     }
 
-    // Default untuk tahun baru yang belum ada data: otomatis Belum Bayar
-    return 'Belum';
+    // 3. Verifikasi Konsistensi Cerdas dengan Transaksi Kas Riil:
+    if (Array.isArray(this.data?.transactions)) {
+      // Jika ada transaksi yang sudah berstatus 'Approved' untuk warga dan bulan ini -> PASTI LUNAS
+      const hasApprovedTx = this.data.transactions.some(t => 
+        t.residentId === resId &&
+        Number(t.periodeBulan) === mNum &&
+        Number(t.periodeTahun || 2026) === yNum &&
+        t.status === 'Approved'
+      );
+      if (hasApprovedTx) {
+        status = 'Lunas';
+        // Auto-heal matrix jika sempat tertinggal statusnya
+        if (matrix[yStr] && matrix[yStr][resId]) {
+          matrix[yStr][resId][mNum] = 'Lunas';
+          matrix[yStr][resId][mStr] = 'Lunas';
+        }
+        return 'Lunas';
+      }
+
+      // Jika matrix berstatus 'Belum', cek apakah ada transaksi 'Pending' yang sedang menunggu verifikasi
+      if (status === 'Belum') {
+        const hasPendingTx = this.data.transactions.some(t => 
+          t.residentId === resId &&
+          Number(t.periodeBulan) === mNum &&
+          Number(t.periodeTahun || 2026) === yNum &&
+          t.status === 'Pending'
+        );
+        if (hasPendingTx) {
+          status = 'Pending';
+        }
+      }
+    }
+
+    return status || 'Belum';
   },
 
   setDuesStatus(resId, year, month, status) {
@@ -3480,7 +3511,10 @@ const App = {
         }
 
         if (txIdx !== -1) {
-          this.data.transactions.splice(txIdx, 1);
+          const removedTx = this.data.transactions.splice(txIdx, 1)[0];
+          if (window.SupabaseSync && typeof window.SupabaseSync.deleteTransactionDirect === 'function' && removedTx) {
+            window.SupabaseSync.deleteTransactionDirect(removedTx.id);
+          }
         }
 
         // 3. Sesuaikan setoran pending jika petugas terkait sudah sempat mengajukan setoran yang menyertakan KK ini
@@ -3499,6 +3533,9 @@ const App = {
 
         // 4. Simpan ke LocalStorage dan Sync Langsung ke Cloud
         DB.save(this.data);
+        if (window.SupabaseSync && typeof window.SupabaseSync.updateDuesDirect === 'function') {
+          window.SupabaseSync.updateDuesDirect(resId, curYear, monthNum, 'Belum');
+        }
         if (window.CloudSync && typeof window.CloudSync.syncNow === 'function') {
           window.CloudSync.syncNow();
         }
@@ -3517,44 +3554,65 @@ const App = {
     }
 
     // =========================================================================
-    // KONDISI 2: STATUS SAAT INI BELUM BAYAR -> UBAH JADI LUNAS
+    // KONDISI 2: STATUS SAAT INI BELUM BAYAR / PENDING -> UBAH JADI LUNAS
     // =========================================================================
     this.setDuesStatus(resId, curYear, monthNum, 'Lunas');
 
     const collectorLabel = AppState.currentRole === 'petugas'
       ? `Petugas ${AppState.currentUser.blokTugas} (${AppState.currentUser.name})`
-      : `Bendahara RT (${this.data.settings.bendahara})`;
+      : `Bendahara RT (${this.data.settings.bendahara || 'Pengurus'})`;
 
-    const kwitansiNo = `KW-IURAN-${res.id}-${curYear}-${monthNum}-${Date.now().toString().slice(-4)}`;
+    // Cek apakah ada transaksi pending sebelumnya untuk warga dan periode ini
+    const existingPending = (this.data.transactions || []).find(t => 
+      t.residentId === resId &&
+      Number(t.periodeBulan) === monthNum &&
+      Number(t.periodeTahun || 2026) === curYear &&
+      t.status === 'Pending'
+    );
 
-    const newTx = {
-      id: `TX-IURAN-${curYear}-${String(monthNum).padStart(2, '0')}-${Date.now().toString().slice(-4)}`,
-      tanggal: new Date().toISOString().slice(0, 10),
-      waktu: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
-      tipe: 'masuk',
-      kategori: 'Iuran Bulanan',
-      judul: `Iuran Bulanan - Bpk. ${res.nama}`,
-      keterangan: `Iuran ${monthName} ${curYear} (${res.alamat})`,
-      residentId: resId,
-      periodeBulan: monthNum,
-      periodeTahun: curYear,
-      blok: res.alamat,
-      nominal: monthlyFee,
-      metode: AppState.currentRole === 'petugas' ? 'Kas Tunai (Petugas Blok)' : 'Kas Tunai (Bendahara RT)',
-      status: 'Approved',
-      kwitansi: kwitansiNo,
-      pencatat: collectorLabel,
-      collectorId: AppState.currentRole === 'petugas' ? (AppState.currentUser.collectorId || 'col-unknown') : 'bendahara',
-      statusSetoran: AppState.currentRole === 'petugas' ? 'di_petugas' : 'disetor_ke_bendahara'
-    };
-    if (!Array.isArray(this.data.transactions)) this.data.transactions = [];
-    this.data.transactions.unshift(newTx);
+    let savedTx = null;
+    let kwitansiNo = `KW-IURAN-${res.id}-${curYear}-${monthNum}-${Date.now().toString().slice(-4)}`;
 
-    // WhatsApp text matching prompt format
-    const waText = `Terima kasih Bpk/Ibu ${res.nama} (${res.alamat}), iuran ${monthName} ${curYear} telah diterima oleh ${collectorLabel}. No. Kwitansi: ${kwitansiNo}. Salam hangat, Pengurus ${this.data.settings.rtName}.`;
-    const waLink = `https://wa.me/${res.phone}?text=${encodeURIComponent(waText)}`;
+    if (existingPending) {
+      existingPending.status = 'Approved';
+      existingPending.pencatat = `${collectorLabel} (Diverifikasi)`;
+      savedTx = existingPending;
+      kwitansiNo = existingPending.kwitansi || kwitansiNo;
+    } else {
+      const newTx = {
+        id: `TX-IURAN-${curYear}-${String(monthNum).padStart(2, '0')}-${Date.now().toString().slice(-4)}`,
+        tanggal: new Date().toISOString().slice(0, 10),
+        waktu: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+        tipe: 'masuk',
+        kategori: 'Iuran Bulanan',
+        judul: `Iuran Bulanan - Bpk. ${res.nama}`,
+        keterangan: `Iuran ${monthName} ${curYear} (${res.alamat})`,
+        residentId: resId,
+        periodeBulan: monthNum,
+        periodeTahun: curYear,
+        blok: res.alamat,
+        nominal: monthlyFee,
+        metode: AppState.currentRole === 'petugas' ? 'Kas Tunai (Petugas Blok)' : 'Kas Tunai (Bendahara RT)',
+        status: 'Approved',
+        kwitansi: kwitansiNo,
+        pencatat: collectorLabel,
+        collectorId: AppState.currentRole === 'petugas' ? (AppState.currentUser.collectorId || 'col-unknown') : 'bendahara',
+        statusSetoran: AppState.currentRole === 'petugas' ? 'di_petugas' : 'disetor_ke_bendahara'
+      };
+      if (!Array.isArray(this.data.transactions)) this.data.transactions = [];
+      this.data.transactions.unshift(newTx);
+      savedTx = newTx;
+    }
 
     DB.save(this.data);
+
+    // Sinkronisasi Langsung ke Supabase PostgreSQL
+    if (window.SupabaseSync && typeof window.SupabaseSync.saveTransactionDirect === 'function' && savedTx) {
+      window.SupabaseSync.saveTransactionDirect(savedTx);
+    }
+    if (window.SupabaseSync && typeof window.SupabaseSync.updateDuesDirect === 'function') {
+      window.SupabaseSync.updateDuesDirect(resId, curYear, monthNum, 'Lunas');
+    }
     if (window.CloudSync && typeof window.CloudSync.syncNow === 'function') {
       window.CloudSync.syncNow();
     }
@@ -3565,6 +3623,10 @@ const App = {
     this.renderSetoranBlok();
     this.renderFinancialReport();
     this.updateNotificationBadge();
+
+    // WhatsApp text matching prompt format
+    const waText = `Terima kasih Bpk/Ibu ${res.nama} (${res.alamat}), iuran ${monthName} ${curYear} telah diterima oleh ${collectorLabel}. No. Kwitansi: ${kwitansiNo}. Salam hangat, Pengurus ${this.data.settings.rtName}.`;
+    const waLink = `https://wa.me/${res.phone}?text=${encodeURIComponent(waText)}`;
 
     if (confirm(`✅ Iuran Bpk/Ibu ${res.nama} (${res.alamat}) bulan ${monthName} ${curYear} berhasil dicatat LUNAS!\n\n🔒 Status sekarang telah dikunci secara otomatis demi keamanan kas.\n\nKirim bukti pembayaran ke WhatsApp warga sekarang?`)) {
       window.open(waLink, '_blank');
@@ -6047,6 +6109,14 @@ const App = {
 
     DB.save(this.data);
 
+    // Sinkronisasi Langsung ke Supabase PostgreSQL
+    if (window.SupabaseSync && typeof window.SupabaseSync.saveTransactionDirect === 'function') {
+      window.SupabaseSync.saveTransactionDirect(tx);
+    }
+    if (window.SupabaseSync && typeof window.SupabaseSync.updateDuesDirect === 'function' && tx.residentId && tx.periodeBulan) {
+      window.SupabaseSync.updateDuesDirect(tx.residentId, tx.periodeTahun || 2026, tx.periodeBulan, 'Lunas');
+    }
+
     if (window.CloudSync && typeof window.CloudSync.saveTransactionDirect === 'function') {
       window.CloudSync.saveTransactionDirect(tx);
     }
@@ -6088,6 +6158,14 @@ const App = {
     }
 
     DB.save(this.data);
+
+    // Sinkronisasi Langsung ke Supabase PostgreSQL
+    if (window.SupabaseSync && typeof window.SupabaseSync.saveTransactionDirect === 'function') {
+      window.SupabaseSync.saveTransactionDirect(tx);
+    }
+    if (window.SupabaseSync && typeof window.SupabaseSync.updateDuesDirect === 'function' && tx.residentId && tx.periodeBulan) {
+      window.SupabaseSync.updateDuesDirect(tx.residentId, tx.periodeTahun || 2026, tx.periodeBulan, 'Belum');
+    }
 
     if (window.CloudSync && typeof window.CloudSync.saveTransactionDirect === 'function') {
       window.CloudSync.saveTransactionDirect(tx);
