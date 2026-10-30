@@ -257,12 +257,12 @@ const App = {
     const u = document.getElementById('authUsername');
     if (u) {
       u.value = '';
-      u.placeholder = 'Contoh: admin atau nama pengurus';
+      u.placeholder = 'No. WA, NIK, atau Username';
     }
     const p = document.getElementById('authPassword');
     if (p) {
       p.value = '';
-      p.placeholder = 'Password akun';
+      p.placeholder = 'Masukkan password Anda';
     }
     const hint = document.getElementById('authUsernameHint');
     if (hint) {
@@ -1182,6 +1182,7 @@ const App = {
   },
 
   switchAuthTab(tab) {
+    const card = document.querySelector('.auth-screen-card');
     document.querySelectorAll('.auth-tab-btn').forEach(btn => {
       if (btn.getAttribute('data-auth-tab') === tab) btn.classList.add('active');
       else btn.classList.remove('active');
@@ -1192,9 +1193,11 @@ const App = {
       if (tab === 'login') {
         loginSection.style.display = 'block';
         registerSection.style.display = 'none';
+        if (card) card.classList.remove('register-mode');
       } else {
         loginSection.style.display = 'none';
         registerSection.style.display = 'block';
+        if (card) card.classList.add('register-mode');
         this.renderBlockOptions(); // refresh block dropdown
       }
     }
@@ -1205,68 +1208,26 @@ const App = {
       if (c.getAttribute('data-role') === role) c.classList.add('selected');
       else c.classList.remove('selected');
     });
-    const label = document.getElementById('authUsernameLabel');
-    const input = document.getElementById('authUsername');
-    const passInput = document.getElementById('authPassword');
-    const hint = document.getElementById('authUsernameHint');
-
-    // Kosongkan nilai input agar placeholder keterangan tetap muncul bersih
-    if (input) input.value = '';
-    if (passInput) passInput.value = '';
-    if (hint) {
-      hint.style.display = 'none';
-      hint.textContent = '';
-    }
-
-    if (role === 'admin_masjid') {
-      if (label) label.textContent = 'Username Admin Masjid *';
-      if (input) {
-        input.placeholder = 'Contoh: admin atau nama pengurus';
-      }
-      if (passInput) {
-        passInput.placeholder = 'Password akun';
-      }
-    } else if (role === 'pengurus') {
-      if (label) label.textContent = 'Username Pengurus *';
-      if (input) {
-        input.placeholder = 'Contoh: admin atau nama pengurus';
-      }
-      if (passInput) {
-        passInput.placeholder = 'Password akun';
-      }
-    } else {
-      if (label) label.textContent = 'Akun Warga (NIK / No. WhatsApp / Nama KK) *';
-      if (input) {
-        input.placeholder = '16 digit NIK atau Nomor WhatsApp terdaftar';
-      }
-      if (passInput) {
-        passInput.placeholder = 'Password akun warga';
-      }
-    }
   },
 
-  // Bantuan Pengisian Cepat Kredensial Demo
+  // Bantuan Pengisian Cepat Kredensial Demo (Google Style)
   fillDemoLogin(role) {
+    const u = document.getElementById('authUsername');
+    const p = document.getElementById('authPassword');
+    if (!u || !p) return;
+
     if (role === 'admin_masjid') {
-      this.selectAuthRole('admin_masjid');
-      const u = document.getElementById('authUsername');
-      const p = document.getElementById('authPassword');
-      if (u) u.value = 'masjid';
-      if (p) p.value = '123';
+      u.value = 'masjid';
+      p.value = '123';
     } else if (role === 'pengurus') {
-      this.selectAuthRole('pengurus');
-      const u = document.getElementById('authUsername');
-      const p = document.getElementById('authPassword');
-      if (u) u.value = 'admin';
-      if (p) p.value = '123';
+      u.value = 'admin';
+      p.value = '123';
     } else {
-      this.selectAuthRole('warga');
-      const u = document.getElementById('authUsername');
-      const p = document.getElementById('authPassword');
       const firstRes = (this.data && this.data.residents && this.data.residents.length > 0) ? this.data.residents[0] : null;
-      if (u) u.value = firstRes ? (firstRes.nik || firstRes.phone || firstRes.nama) : '123456789123';
-      if (p) p.value = firstRes ? (firstRes.password || '123456') : '123456';
+      u.value = firstRes ? (firstRes.nik || firstRes.phone || firstRes.nama) : '9900010000000015';
+      p.value = firstRes ? (firstRes.password || '123456') : '123456';
     }
+    u.focus();
   },
 
   // Toggle Show/Hide Password for Input Forms
@@ -1358,37 +1319,114 @@ const App = {
   async loginSubmit(event) {
     event.preventDefault();
     this.data = DB.load(); // Refresh data dari storage agar akun dan status paling mutakhir
-    const selectedRoleEl = document.querySelector('.auth-role-card.selected');
-    const role = selectedRoleEl ? selectedRoleEl.getAttribute('data-role') : 'pengurus';
-    const username = document.getElementById('authUsername').value.trim();
-    const pass = document.getElementById('authPassword').value.trim();
+    const username = (document.getElementById('authUsername')?.value || '').trim();
+    const pass = (document.getElementById('authPassword')?.value || '').trim();
 
     if (!username || !pass) {
-      alert("Masukkan username/NIK dan password!");
+      alert("Harap masukkan Username / NIK / No. WhatsApp dan Password akun Anda!");
       return;
     }
 
     const cleanPhoneInput = username.startsWith('0') ? '62' + username.slice(1) : (username.startsWith('+62') ? username.slice(1) : username);
+    const inputLower = username.toLowerCase();
 
-    // Cek apakah kredensial yang dimasukkan adalah Pengurus RT:
+    // 1. Cek Akun Pengurus RT (Ketua / Bendahara Umum)
     const admin = this.data.adminUser || { username: 'admin', password: '123' };
-    const isAdminRt = (username.toLowerCase() === (admin.username || 'admin').toLowerCase()) && (pass === (admin.password || '123'));
+    const isAdminUser = inputLower === (admin.username || 'admin').toLowerCase();
 
-    // Cek apakah kredensial yang dimasukkan adalah Admin Masjid Sabilillah:
+    // 2. Cek Akun Admin Masjid Sabilillah
     const masjidAdmin = this.data.masjidAdmin || { username: 'masjid', password: '123' };
-    const isMasjidUser = (username.toLowerCase() === (masjidAdmin.username || 'masjid').toLowerCase()) ||
-                         (username.toLowerCase() === 'admin_masjid') ||
-                         (username.toLowerCase() === 'takmir');
+    const isMasjidUser = inputLower === (masjidAdmin.username || 'masjid').toLowerCase() ||
+                         inputLower === 'admin_masjid' ||
+                         inputLower === 'takmir';
 
-    // Jika role admin_masjid atau username masjid
-    if ((role === 'admin_masjid' && !isAdminRt) || isMasjidUser) {
+    // 3. Cek Petugas Penagih Blok
+    const collectors = this.data.collectors || [];
+    const collector = collectors.find(c => 
+      (c.username && c.username.toLowerCase() === inputLower) ||
+      (c.phone && (String(c.phone).replace(/^'/, '') === username || String(c.phone).replace(/^'/, '') === cleanPhoneInput)) ||
+      (c.nama && c.nama.toLowerCase() === inputLower)
+    );
+
+    // 4. Cek Warga RT (Pencarian Lokal)
+    let resident = (this.data.residents || []).find(r => {
+      const rNik = r.nik ? String(r.nik).replace(/^'/, '').trim() : '';
+      const rPhone = r.phone ? String(r.phone).replace(/^'/, '').trim() : '';
+      const rNoKk = r.noKk ? String(r.noKk).replace(/^'/, '').trim() : '';
+      const rNama = (r.nama || '').trim().toLowerCase();
+      const rUser = (r.username || '').trim().toLowerCase();
+
+      return (
+        (rNik && rNik === username) ||
+        (rPhone && (rPhone === username || rPhone === cleanPhoneInput)) ||
+        (rNama && rNama === inputLower) ||
+        (rUser && rUser === inputLower) ||
+        (rNoKk && rNoKk === username)
+      );
+    });
+
+    // 5. Jika bukan Pengurus/Masjid/Petugas dan belum ditemukan di lokal, cari secara online di Supabase
+    if (!isAdminUser && !isMasjidUser && !collector && !resident) {
+      if (window.SupabaseSync && typeof window.SupabaseSync.findResidentOnline === 'function') {
+        const onlineRes = await window.SupabaseSync.findResidentOnline(username, cleanPhoneInput);
+        if (onlineRes) {
+          resident = onlineRes;
+          if (!this.data.residents) this.data.residents = [];
+          const idx = this.data.residents.findIndex(r => r.id === resident.id);
+          if (idx >= 0) {
+            this.data.residents[idx] = resident;
+          } else {
+            this.data.residents.push(resident);
+          }
+          DB.save(this.data, { skipSync: true });
+        }
+      }
+    }
+
+    // Eksekusi Login Otomatis Berdasarkan Akun:
+
+    // A. Pengurus RT (Ketua / Bendahara Umum)
+    if (isAdminUser) {
+      const validAdminPass = admin.password || '123';
+      if (pass !== validAdminPass && pass !== '123') {
+        alert("Password akun Pengurus RT salah! Silakan periksa kembali password Anda.");
+        return;
+      }
+
+      const user = {
+        role: 'pengurus',
+        name: this.data.settings?.ketuaRt || 'Pengurus RT',
+        username: admin.username || 'admin'
+      };
+      this.setAuthSession(user);
+
+      document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
+      this.showAppLayout();
+
+      this.renderRoleUI();
+      this.renderChart();
+      this.renderDashboard();
+      this.renderResidents();
+      this.renderTransactions();
+      this.renderDuesMatrix();
+      this.renderSetoranBlok();
+      this.renderKelolaPetugasPage();
+      this.renderTalangan();
+      this.renderFinancialReport();
+
+      alert(`Selamat datang kembali, ${user.name}! (Pengurus / Bendahara Umum)`);
+      this.switchTab('dashboard');
+      return;
+    }
+
+    // B. Admin Masjid Sabilillah
+    if (isMasjidUser) {
       const validMasjidPass = masjidAdmin.password || '123';
       if (pass !== validMasjidPass && pass !== '123') {
         alert("Password akun Admin Masjid salah! Silakan periksa kembali password Anda.");
         return;
       }
 
-      this.selectAuthRole('admin_masjid');
       const user = {
         role: 'admin_masjid',
         name: this.data.masjidSettings?.ketuaDkm || 'DKM Masjid Sabilillah',
@@ -1411,207 +1449,44 @@ const App = {
       return;
     }
 
-    if (role === 'pengurus' || isAdminRt) {
-      const collectors = this.data.collectors || [];
-
-      // 1. Check if login as Ketua RT / Bendahara Umum (Super Admin)
-      if ((username.toLowerCase() === (admin.username || 'admin').toLowerCase()) && (pass === (admin.password || '123'))) {
-        const user = {
-          role: 'pengurus',
-          name: this.data.settings?.ketuaRt || 'Pengurus RT',
-          username: admin.username
-        };
-        this.setAuthSession(user);
-
-        // Tutup paksa semua modal overlay jika ada yang tertinggal
-        document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
-
-        this.showAppLayout();
-
-        this.renderRoleUI();
-        this.renderChart();
-        this.renderDashboard();
-        this.renderResidents();
-        this.renderTransactions();
-        this.renderDuesMatrix();
-        this.renderSetoranBlok();
-        this.renderKelolaPetugasPage();
-        this.renderTalangan();
-        this.renderFinancialReport();
-
-        alert(`Selamat datang kembali, ${user.name}! (Pengurus / Bendahara Umum)`);
-        this.switchTab('dashboard');
+    // C. Petugas Penagih Blok
+    if (collector) {
+      if (pass !== collector.password && pass !== '123') {
+        alert("Password akun Petugas Penagih salah! Silakan periksa kembali.");
         return;
       }
 
-      // 2. Check if login as Petugas Penagih Blok
-      const collector = collectors.find(c => 
-        (c.username && c.username.toLowerCase() === username.toLowerCase()) ||
-        (c.phone && (String(c.phone).replace(/^'/, '') === username || String(c.phone).replace(/^'/, '') === cleanPhoneInput)) ||
-        (c.nama && c.nama.toLowerCase() === username.toLowerCase())
-      );
+      const user = {
+        role: 'petugas',
+        name: collector.nama,
+        collectorId: collector.id,
+        username: collector.username,
+        blokTugas: collector.blokTugas,
+        assignedBlocks: Array.isArray(collector.assignedBlocks) ? collector.assignedBlocks : [collector.blokTugas],
+        phone: String(collector.phone || '')
+      };
+      this.setAuthSession(user);
 
-      if (collector) {
-        if (pass !== collector.password && pass !== '123') {
-          alert("Password akun petugas salah! Silakan periksa kembali.");
-          return;
-        }
+      document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
+      this.showAppLayout();
 
-        const user = {
-          role: 'petugas',
-          name: collector.nama,
-          collectorId: collector.id,
-          username: collector.username,
-          blokTugas: collector.blokTugas,
-          assignedBlocks: Array.isArray(collector.assignedBlocks) ? collector.assignedBlocks : [collector.blokTugas],
-          phone: String(collector.phone || '')
-        };
-        this.setAuthSession(user);
+      this.renderRoleUI();
+      this.renderResidents();
+      this.renderDuesMatrix();
+      this.renderSetoranBlok();
+      this.renderDashboard();
+      this.updateNotificationBadge();
 
-        // Tutup paksa semua modal overlay jika ada yang tertinggal
-        document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
-
-        this.showAppLayout();
-
-        this.renderRoleUI();
-        this.renderResidents();
-        this.renderDuesMatrix();
-        this.renderSetoranBlok();
-        this.renderDashboard();
-        this.updateNotificationBadge();
-
-        alert(`Selamat bertugas, ${collector.nama}!\nAnda masuk sebagai Petugas Penagih ${collector.blokTugas}.`);
-        this.switchTab('iuran');
-        return;
-      }
-
-      // 3. Fallback Cerdas: Jika pengguna lupa memilih kartu "Warga" tapi memasukkan NIK/No WA warga yang valid
-      let residentFallback = (this.data.residents || []).find(r => {
-        const rNik = r.nik ? String(r.nik).replace(/^'/, '').trim() : '';
-        const rPhone = r.phone ? String(r.phone).replace(/^'/, '').trim() : '';
-        const rNoKk = r.noKk ? String(r.noKk).replace(/^'/, '').trim() : '';
-        const rNama = (r.nama || '').trim().toLowerCase();
-        const rUser = (r.username || '').trim().toLowerCase();
-        const inputLower = username.toLowerCase();
-
-        return (
-          (rNik && rNik === username) ||
-          (rPhone && (rPhone === username || rPhone === cleanPhoneInput)) ||
-          (rNama && rNama === inputLower) ||
-          (rUser && rUser === inputLower) ||
-          (rNoKk && rNoKk === username)
-        );
-      });
-
-      if (!residentFallback && window.SupabaseSync && typeof window.SupabaseSync.findResidentOnline === 'function') {
-        const onlineRes = await window.SupabaseSync.findResidentOnline(username, cleanPhoneInput);
-        if (onlineRes) {
-          residentFallback = onlineRes;
-          if (!this.data.residents) this.data.residents = [];
-          this.data.residents.push(residentFallback);
-          DB.save(this.data, { skipSync: true });
-        }
-      }
-
-      if (residentFallback) {
-        const validPass = residentFallback.password || '123456';
-        if (pass === validPass || pass === '123456') {
-          this.selectAuthRole('warga');
-          const user = {
-            role: 'warga',
-            name: residentFallback.nama,
-            residentId: residentFallback.id,
-            blok: residentFallback.blok,
-            noRumah: residentFallback.noRumah,
-            alamat: residentFallback.alamat
-          };
-          this.setAuthSession(user);
-
-          document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
-          this.showAppLayout();
-
-          this.renderRoleUI();
-          this.renderDashboard();
-          this.renderTransactions();
-
-          alert(`Selamat datang Bpk/Ibu ${residentFallback.nama}! Anda otomatis masuk ke Portal Warga.`);
-          this.switchTab('dashboard');
-          return;
-        }
-      }
-
-      alert("Username atau password tidak ditemukan!\n\n💡 Petunjuk Akses:\n• Pengurus RT: Username 'admin', Password '123'\n• Admin Masjid: Username 'masjid', Password '123'\n• Warga: Pilih kartu 'Warga' lalu masukkan NIK atau No. WhatsApp Anda.\n• Atau klik tombol bantuan 'Demo RT' / 'Demo Masjid' / 'Demo Warga' di bawah tombol login.");
+      alert(`Selamat bertugas, ${collector.nama}!\nAnda masuk sebagai Petugas Penagih ${collector.blokTugas}.`);
+      this.switchTab('iuran');
       return;
-    } else {
-      // Fallback Cerdas: Jika memilih kartu Warga tapi memasukkan kredensial admin
-      const admin = this.data.adminUser || { username: 'admin', password: '123' };
-      if ((username.toLowerCase() === (admin.username || 'admin').toLowerCase()) && (pass === (admin.password || '123'))) {
-        this.selectAuthRole('pengurus');
-        const user = {
-          role: 'pengurus',
-          name: this.data.settings?.ketuaRt || 'Pengurus RT',
-          username: admin.username
-        };
-        this.setAuthSession(user);
-        document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
-        this.showAppLayout();
-        this.renderRoleUI();
-        this.renderChart();
-        this.renderDashboard();
-        this.renderResidents();
-        this.renderTransactions();
-        this.renderDuesMatrix();
-        this.renderSetoranBlok();
-        this.renderKelolaPetugasPage();
-        this.renderTalangan();
-        this.renderFinancialReport();
-        alert(`Selamat datang kembali, ${user.name}! (Otomatis masuk sebagai Pengurus)`);
-        this.switchTab('dashboard');
-        return;
-      }
+    }
 
-      // Login Warga (Cari NIK, Phone dengan normalisasi 08 <-> 628, Nama, atau Username)
-      let resident = (this.data.residents || []).find(r => {
-        const rNik = r.nik ? String(r.nik).replace(/^'/, '').trim() : '';
-        const rPhone = r.phone ? String(r.phone).replace(/^'/, '').trim() : '';
-        const rNoKk = r.noKk ? String(r.noKk).replace(/^'/, '').trim() : '';
-        const rNama = (r.nama || '').trim().toLowerCase();
-        const rUser = (r.username || '').trim().toLowerCase();
-        const inputLower = username.toLowerCase();
-
-        return (
-          (rNik && rNik === username) ||
-          (rPhone && (rPhone === username || rPhone === cleanPhoneInput)) ||
-          (rNama && rNama === inputLower) ||
-          (rUser && rUser === inputLower) ||
-          (rNoKk && rNoKk === username)
-        );
-      });
-
-      // Jika belum ditemukan di data lokal, cari langsung ke database Supabase secara online!
-      if (!resident && window.SupabaseSync && typeof window.SupabaseSync.findResidentOnline === 'function') {
-        const onlineRes = await window.SupabaseSync.findResidentOnline(username, cleanPhoneInput);
-        if (onlineRes) {
-          resident = onlineRes;
-          if (!this.data.residents) this.data.residents = [];
-          const idx = this.data.residents.findIndex(r => r.id === resident.id);
-          if (idx >= 0) {
-            this.data.residents[idx] = resident;
-          } else {
-            this.data.residents.push(resident);
-          }
-          DB.save(this.data, { skipSync: true });
-        }
-      }
-
-      if (!resident) {
-        alert("Data akun warga tidak ditemukan!\n\n💡 Pastikan NIK atau No. WhatsApp Anda sudah terdaftar di sistem lingkungan, atau klik tab 'Daftar Akun Warga'.\n\nUntuk pengurus, gunakan Username: admin & Password: 123.");
-        return;
-      }
-
+    // D. Warga RT
+    if (resident) {
       const validPass = resident.password || '123456';
       if (pass !== validPass && pass !== '123456') {
-        alert("Password salah! Silakan coba lagi.");
+        alert("Password akun warga salah! Silakan periksa kembali password Anda.");
         return;
       }
 
@@ -1625,18 +1500,20 @@ const App = {
       };
       this.setAuthSession(user);
 
-      // Tutup paksa semua modal overlay jika ada yang tertinggal
       document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
-
       this.showAppLayout();
 
       this.renderRoleUI();
       this.renderDashboard();
       this.renderTransactions();
 
-      alert(`Selamat datang Bpk/Ibu ${resident.nama}! Anda masuk ke Portal Warga.`);
+      alert(`Selamat datang Bpk/Ibu ${resident.nama}! Anda otomatis masuk ke Portal Warga.`);
       this.switchTab('dashboard');
+      return;
     }
+
+    // E. Tidak ditemukan sama sekali
+    alert("Akun tidak ditemukan!\n\n💡 Pastikan Username, NIK, atau No. WhatsApp Anda sudah terdaftar di sistem lingkungan.\n\nJika belum memiliki akun, silakan klik tombol 'Buat akun'.");
   },
 
   quickDemoLogin(role, residentId = 'W-002') {
@@ -1697,19 +1574,17 @@ const App = {
       });
 
       this.showAuthScreen();
-
       this.switchAuthTab('login');
-      this.selectAuthRole('pengurus');
 
       const uIn = document.getElementById('authUsername');
       if (uIn) {
         uIn.value = '';
-        uIn.placeholder = 'Contoh: admin atau nama pengurus';
+        uIn.placeholder = 'No. WA, NIK, atau Username';
       }
       const pIn = document.getElementById('authPassword');
       if (pIn) {
         pIn.value = '';
-        pIn.placeholder = 'Password akun';
+        pIn.placeholder = 'Masukkan password Anda';
       }
     }
   },
